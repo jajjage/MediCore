@@ -1,0 +1,25 @@
+{
+  "cSpell.words": [
+    "dateutil",
+    "djangorestframework",
+    "fernet",
+    "medicore",
+    "psycopg",
+    "pylint",
+    "pytest",
+    "sqltools"
+  ],
+  "git.ignoreLimitWarning": true,
+  "sqltools.connections": [
+    {
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 5432,
+      "askForPassword": true,
+      "driver": "PostgreSQL",
+      "name": "medicore",
+      "username": "medicore_user",
+      "database": "medicore_db"
+    }
+  ]
+}

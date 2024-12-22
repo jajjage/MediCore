@@ -1,0 +1,34 @@
+# Core Framework
+Django
+djangorestframework
+django-tenants  # Changed from django-tenant-schemas
+django-cors-headers
+
+# Database
+psycopg2-binary
+django-redis
+
+# Security
+python-jose
+cryptography
+django-environ
+
+# Development
+black
+pylint
+pytest
+pytest-django
+factory-boy
+
+# API Documentation
+drf-spectacular
+
+# Task Queue
+celery
+
+# Monitoring
+sentry-sdk
+
+# Added for Encryption and Tenant Management
+python-dateutil
+django-model-utils
