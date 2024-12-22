@@ -5,9 +5,11 @@
     "fernet",
     "medicore",
     "psycopg",
+    "pycache",
     "pylint",
     "pytest",
-    "sqltools"
+    "sqltools",
+    "venv"
   ],
   "git.ignoreLimitWarning": true,
   "sqltools.connections": [
