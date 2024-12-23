@@ -3,7 +3,8 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from django_tenants.utils import schema_context
-from apps.tenants.models import Client, Domain, HospitalProfile
+from hospital.models import HospitalProfile
+from tenants.models import Client, Domain
 from datetime import datetime, timedelta
 import uuid
 
@@ -53,11 +54,11 @@ class Command(BaseCommand):
 
             # Create admin user and hospital profile
             with schema_context(tenant.schema_name):
-                admin_user = User.objects.create_superuser(
+                admin_user = User.objects.create_hospital_admin(
                     email=options['admin_email'],
                     password=options['admin_password'],
-                    # first_name='Hospital',
-                    # last_name='Admin'
+                    first_name='Hospital',
+                    last_name='Admin'
                 )
                 self.stdout.write(self.style.SUCCESS(f'Created admin user: {admin_user.email}'))
 
@@ -66,7 +67,12 @@ class Command(BaseCommand):
                     admin_user=admin_user,
                     subscription_plan=options['subscription_plan'],
                     hospital_name=options['name'],
-                    contact_email=options['admin_email']
+                    contact_email=options['admin_email'],
+                    contact_phone='1234567890',
+                    license_number=uuid.uuid4().hex[:8],
+                    address='123 Main St, City, State, Zip',
+                    specialty='General',
+                    bed_capacity=100,
                 )
                 self.stdout.write(
                     self.style.SUCCESS(f'Created hospital profile for: {hospital_profile.hospital_name}')

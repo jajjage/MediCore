@@ -44,8 +44,11 @@ SHARED_APPS = (
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'apps.tenants',
+    'rest_framework',
+    'djoser',
+    'tenants',
     "core",
+    "hospital",
 )
 
 MIDDLEWARE = [

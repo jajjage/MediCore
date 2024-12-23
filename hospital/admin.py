@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.tenants.models import HospitalProfile
+from .models import HospitalProfile
 
 @admin.register(HospitalProfile)
 class HospitalProfileAdmin(admin.ModelAdmin):
