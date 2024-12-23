@@ -23,21 +23,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-pbl$hiccsn#tfhfdrz_u=q9&q1=&k^n8)q+4s&8*ql=j)w37hx"
+SECRET_KEY = env("DJANGO_SECRET_KEY", default="django-insecure$@")
 ENCRYPTION_KEY=env('ENCRYPTION_KEY', default='')
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env("DEBUG", default=True)
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = env("ALLOWED_HOSTS", default="*").split(",")
 
 # Application definition
-TENANT_APPS = [
-    'patients',  # Example tenant-specific apps
-]
+TENANT_APPS = (
+    'apps.patients',  # Example tenant-specific apps
+)
 
 
-SHARED_APPS = [
+SHARED_APPS = (
     "django_tenants",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -45,11 +44,13 @@ SHARED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'tenants',
-]
+    'apps.tenants',
+    "core",
+)
 
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
+    "medicore.middleware.DebugTenantMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -59,7 +60,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-INSTALLED_APPS = SHARED_APPS + TENANT_APPS
+INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 ROOT_URLCONF = "medicore.urls"
 
 TEMPLATES = [
@@ -69,8 +70,8 @@ TEMPLATES = [
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
-                "django.template.context_processors.debug",
                 "django.template.context_processors.request",
+                "django.template.context_processors.debug",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
@@ -78,7 +79,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "Medicore.wsgi.application"
+WSGI_APPLICATION = "medicore.wsgi.application"
 
 
 # Database
@@ -99,6 +100,15 @@ DATABASES = {
 DATABASE_ROUTERS = (
     'django_tenants.routers.TenantSyncRouter',
 )
+
+
+# CACHES = {
+#     "default": {
+#         'KEY_FUNCTION': 'django_tenants.cache.make_key',
+#         'REVERSE_KEY_FUNCTION': 'django_tenants.cache.reverse_key',
+#     },
+# }
+
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
@@ -116,6 +126,18 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
+
+
+
+# settings.py
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': (
+#         'rest_framework_simplejwt.authentication.JWTAuthentication',
+#     ),
+#     'DEFAULT_PERMISSION_CLASSES': (
+#         'rest_framework.permissions.IsAuthenticated',
+#     ),
+# }
 
 
 # Internationalization
@@ -140,6 +162,31 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# settings.py
+AUTH_USER_MODEL = 'core.MyUser'
+
+
 TENANT_MODEL = "tenants.Client"
 TENANT_DOMAIN_MODEL = "tenants.Domain"
 PUBLIC_SCHEMA_NAME = 'public'
+# PUBLIC_SCHEMA_URLCONF = 'medicore.urls'
+
+DJANGO_TENANTS = {
+    'DEFAULT_SCHEMA': 'public',  # Default schema to use
+}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django_tenants': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+        },
+    },
+}

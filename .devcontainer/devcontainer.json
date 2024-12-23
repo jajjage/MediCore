@@ -1,40 +1,39 @@
 {
-    "name": "MediCore Development Environment",
-    "dockerComposeFile": "../docker-compose.yaml",
-    "service": "app",
-    "workspaceFolder": "/workspace/MediCore",
-    "customizations": {
-        "vscode": {
-            "settings": {
-                "python.defaultInterpreterPath": "/usr/local/bin/python",
-                "python.linting.enabled": true,
-                "python.linting.pylintEnabled": true,
-                "python.formatting.provider": "black",
-                "editor.formatOnSave": true,
-                "editor.codeActionsOnSave": {
-                    "source.organizeImports": "explicit"
-                }
-            },
-            "extensions": [
-                "ms-python.python",
-                "ms-python.vscode-pylance",
-                "mtxr.sqltools",
-                "mtxr.sqltools-driver-pg",
-                "esbenp.prettier-vscode",
-                "dbaeumer.vscode-eslint",
-                "eamodio.gitlens",
-                "ms-azuretools.vscode-docker",
-                "streetsidesoftware.code-spell-checker",
-                "yzhang.markdown-all-in-one",
-                "GitHub.copilot"
-            ]
+  "name": "MediCore Development Environment",
+  "dockerComposeFile": "../docker-compose.yaml",
+  "service": "app",
+  // "containerEnv": {
+  //   "HOSTNAME": "medicore.local"
+  // },
+  "workspaceFolder": "/workspace/MediCore",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.formatting.provider": "black",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
         }
-    },
-    "forwardPorts": [
-        8000,
-        5432,
-        6379
-    ],
-    "postCreateCommand": "pip install --user -r requirements.txt",
-    "remoteUser": "vscode"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "eamodio.gitlens",
+        "ms-azuretools.vscode-docker",
+        "streetsidesoftware.code-spell-checker",
+        "yzhang.markdown-all-in-one",
+        "GitHub.copilot"
+      ]
+    }
+  },
+  "forwardPorts": [8000, 5432, 6379],
+  "postCreateCommand": "pip install --user -r requirements.txt",
+  "remoteUser": "vscode"
 }

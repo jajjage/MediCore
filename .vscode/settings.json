@@ -2,12 +2,14 @@
   "cSpell.words": [
     "dateutil",
     "djangorestframework",
+    "djoser",
     "fernet",
     "medicore",
     "psycopg",
     "pycache",
     "pylint",
     "pytest",
+    "simplejwt",
     "sqltools",
     "venv"
   ],
