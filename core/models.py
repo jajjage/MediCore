@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import connection, models
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser
 from django.utils.translation import gettext_lazy as _
 
@@ -35,11 +35,12 @@ class MyUserManager(BaseUserManager):
             is_superuser=True
         )
 
-    def create_hospital_admin(self, email, first_name, last_name, password=None):
+    def create_hospital_admin(self, email, hospital, first_name, last_name, password=None):
         return self.create_user(
             email=email,
             first_name=first_name,
             last_name=last_name,
+            hospital=hospital,
             role='staff',
             staff_role='admin',
             password=password,
@@ -105,38 +106,43 @@ class MyUser(AbstractBaseUser):
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
     
+   
     @property
     def is_staff(self):
         """
-        Determines admin interface access - only for hospital admins
+        Controls access to admin panel
         """
-        return self.is_admin or (self.role == "staff" and self.staff_role == "admin")
-    
-    @property
-    def can_access_patient_data(self):
-        """
-        Only doctors and nurses can access patient data
-        """
-        return (
-            self.role == "staff" 
-            and self.staff_role in ["doctor", "nurse"]
-        )
+        if connection.schema_name == 'public':
+            # Only superusers can access main domain admin
+            return self.is_superuser
+        else:
+            # In tenant schemas, admin role can access tenant admin
+            return self.is_admin and self.role == 'staff' and self.staff_role == 'admin'
 
     def has_perm(self, perm, obj=None):
         """
-        Check permissions based on role
+        Controls permissions in admin panel
         """
-        # For patient-related permissions
-        if perm in ['view_patient_records', 'edit_patient_records']:
-            return self.can_access_patient_data
-            
-        # For other admin permissions
-        return self.is_admin or self.is_superuser
+        if connection.schema_name == 'public':
+            # In main domain, only superuser has full permissions
+            if not self.is_superuser:
+                # Block access to tenant-specific models
+                if perm.startswith('tenant.'):
+                    return False
+            return self.is_superuser
+        else:
+            # In tenant schemas, admin has permissions for non-public apps
+            return self.is_admin
 
     def has_module_perms(self, app_label):
-        if self.is_admin or self.is_superuser:
-            return True
-        return self.is_active and any(
-            perm.codename.startswith(app_label)
-            for perm in self.user_permissions.all()
-        )
+        """
+        Controls which apps are visible in admin
+        """
+        if connection.schema_name == 'public':
+            if self.is_superuser:
+                # Superuser can see all apps except tenant-specific ones
+                return True
+            return False
+        else:
+            # In tenant schemas, admin can only see tenant-specific apps
+            return self.is_admin and app_label not in ['tenant', 'core']

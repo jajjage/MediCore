@@ -1,16 +1,18 @@
 from django.contrib import admin
-
+from django_tenants.utils import get_public_schema_name
+from django.db import connection
 from .models import HospitalProfile
 
 @admin.register(HospitalProfile)
 class HospitalProfileAdmin(admin.ModelAdmin):
-    list_display = ('hospital_name', 'subscription_plan', 'contact_email', 'created_at')
-    readonly_fields = ('tenant', 'admin_user', 'created_at', 'updated_at')
-    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if connection.schema_name == get_public_schema_name():
+            # On main domain, superuser can see all profiles
+            return qs
+        # On tenant domain, only show current tenant's profile
+        return qs.filter(tenant__schema_name=connection.schema_name)
+
     def has_add_permission(self, request):
-        # Only superuser can add hospital profiles
-        return request.user.is_superuser
-    
-    def has_delete_permission(self, request, obj=None):
-        # Only superuser can delete hospital profiles
-        return request.user.is_superuser
+        # Only allow adding profiles from main domain
+        return connection.schema_name == get_public_schema_name()
