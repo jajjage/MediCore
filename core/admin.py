@@ -3,12 +3,14 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _
 from .models import MyUser
-# from .forms import UserChangeForm, UserCreationForm
+from .forms import UserChangeForm, UserCreationForm
 from django.db import connection
 from django_tenants.utils import get_public_schema_name
 
 @admin.register(MyUser)
 class CustomUserAdmin(admin.ModelAdmin):  # Changed from UserAdmin to admin.ModelAdmin
+    form = UserChangeForm
+    add_form = UserCreationForm
     list_display = ('email', 'role', 'staff_role', 'is_admin', 'is_active')
     list_filter = ('role', 'staff_role', 'is_admin', 'is_active')
     search_fields = ('email', 'first_name', 'last_name')
