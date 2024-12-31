@@ -17,7 +17,8 @@
     "sqltools",
     "staffmember",
     "staffrole",
-    "venv"
+    "venv",
+    "viewsets"
   ],
   "git.ignoreLimitWarning": true,
   "sqltools.connections": [

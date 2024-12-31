@@ -41,6 +41,7 @@ DEFAULT_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "djoser",
+    
 ]
 
 # Apps that are specific to individual tenants
