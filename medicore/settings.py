@@ -24,35 +24,46 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="django-insecure$@")
-ENCRYPTION_KEY=env('ENCRYPTION_KEY', default='')
+ENCRYPTION_KEY = env("ENCRYPTION_KEY", default="")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG", default=True)
 
 ALLOWED_HOSTS = env("ALLOWED_HOSTS", default="*").split(",")
 
 # Application definition
-TENANT_APPS = (
-    'apps.patients',  # Example tenant-specific apps
-)
-
-
-SHARED_APPS = (
-    "django_tenants",
+# List of default Django apps and third-party apps that are common to both shared and tenant apps
+DEFAULT_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'rest_framework',
-    'djoser',
-    'tenants',
+    "rest_framework",
+    "djoser",
+]
+
+# Apps that are specific to individual tenants
+TENANT_APPS = [
+    *DEFAULT_APPS,  # Unpack default apps
+    "apps.patients",  # Example tenant-specific app
+    "apps.staff",
+]
+
+# Apps that are shared across all tenants
+SHARED_APPS = [
+    *DEFAULT_APPS,  # Unpack default apps
+    "django_tenants",
+    "tenants",
     "core",
     "hospital",
-)
+]
+
+# Validate that all tenant apps are also in INSTALLED_APPS
+INSTALLED_APPS = list(set(SHARED_APPS) | set(TENANT_APPS))
 
 MIDDLEWARE = [
-    'django_tenants.middleware.main.TenantMainMiddleware',
+    "django_tenants.middleware.main.TenantMainMiddleware",
     "medicore.middleware.DebugTenantMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -60,11 +71,10 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    'core.middleware.AdminAccessMiddleware',
+    "core.middleware.AdminAccessMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 ROOT_URLCONF = "medicore.urls"
 
 TEMPLATES = [
@@ -91,19 +101,17 @@ WSGI_APPLICATION = "medicore.wsgi.application"
 
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django_tenants.postgresql_backend', # Changed from django_tenant_schemas.postgresql_backend
-        'NAME': env('POSTGRES_DB', default='medicore_db'),
-        'USER': env('POSTGRES_USER', default='medicore_user'),
-        'PASSWORD': env('POSTGRES_PASSWORD', default='medicore_password'),
-        'HOST': env('POSTGRES_HOST', default='localhost'),
-        'PORT': env('POSTGRES_PORT', default='5432'),
+    "default": {
+        "ENGINE": "django_tenants.postgresql_backend",  # Changed from django_tenant_schemas.postgresql_backend
+        "NAME": env("POSTGRES_DB", default="medicore_db"),
+        "USER": env("POSTGRES_USER", default="medicore_user"),
+        "PASSWORD": env("POSTGRES_PASSWORD", default="medicore_password"),
+        "HOST": env("POSTGRES_HOST", default="localhost"),
+        "PORT": env("POSTGRES_PORT", default="5432"),
     }
 }
 
-DATABASE_ROUTERS = (
-    'django_tenants.routers.TenantSyncRouter',
-)
+DATABASE_ROUTERS = ("django_tenants.routers.TenantSyncRouter",)
 
 
 # CACHES = {
@@ -131,18 +139,17 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-BASE_DOMAIN = 'medicore.local'
+BASE_DOMAIN = "medicore.local"
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.TokenAuthentication",
     ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
     ],
 }
-
 
 
 # Internationalization
@@ -168,10 +175,9 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # settings.py
-AUTH_USER_MODEL = 'core.MyUser'
+AUTH_USER_MODEL = "core.MyUser"
 
 
 TENANT_MODEL = "tenants.Client"
 TENANT_DOMAIN_MODEL = "tenants.Domain"
-PUBLIC_SCHEMA_NAME = 'public'
-
+PUBLIC_SCHEMA_NAME = "public"

@@ -1,16 +1,19 @@
 {
   "cSpell.words": [
+    "changeme",
     "dateutil",
     "djangorestframework",
     "djoser",
     "fernet",
     "medicore",
+    "myuser",
     "psycopg",
     "pycache",
     "pylint",
     "pytest",
     "simplejwt",
     "sqltools",
+    "staffmember",
     "venv"
   ],
   "git.ignoreLimitWarning": true,
