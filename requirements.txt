@@ -5,6 +5,7 @@ django-tenants  # Changed from django-tenant-schemas
 django-cors-headers
 djangorestframework-simplejwt
 djoser
+drf-nested-routers
 
 # Database
 psycopg2-binary

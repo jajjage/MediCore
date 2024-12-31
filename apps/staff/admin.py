@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from django_tenants.utils import get_tenant_domain_model, get_tenant
+from django_tenants.utils import get_tenant_domain_model
 from django_tenants.utils import schema_context
 from hospital.models import HospitalProfile
 from .models import StaffMember, Department, StaffRole
@@ -19,7 +19,7 @@ class StaffMemberAdmin(UserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('email', 'password1', 'password2', 'role', 'department'),
+            'fields': ('first_name', 'last_name', 'email', 'password1', 'password2', 'role', 'department'),
         }),
     )
     search_fields = ('email', 'first_name', 'last_name')

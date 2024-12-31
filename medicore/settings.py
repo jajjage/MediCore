@@ -48,6 +48,9 @@ TENANT_APPS = [
     *DEFAULT_APPS,  # Unpack default apps
     "apps.patients",  # Example tenant-specific app
     "apps.staff",
+    # "apps.doctors",
+    # "apps.nurses",
+    # "apps.receptionists",
 ]
 
 # Apps that are shared across all tenants

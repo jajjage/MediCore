@@ -7,6 +7,7 @@ from django.contrib.auth.models import (
     BaseUserManager,
     PermissionsMixin,
 )
+
 from hospital.models import HospitalProfile
 
 
@@ -25,19 +26,6 @@ class StaffUserManager(BaseUserManager):
         return user
 
 
-class StaffRole(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100)
-    permissions = models.ManyToManyField(Permission)
-
-    class Meta:
-        permissions = [
-            ("can_manage_roles", "Can manage staff roles"),
-        ]
-
-    def __str__(self):
-        return self.name
-
 
 class Department(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -46,8 +34,25 @@ class Department(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.hospital.hospital_name}"
+    class Meta:
+        db_table = "department"
+    
+# models.py
+class StaffRole(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=50, unique=True)
+    permissions = models.ManyToManyField(
+        'auth.Permission',
+        blank=True,
+        related_name='staff_roles'
+    )
+    
+    class Meta:
+        db_table = "staff_staffrole"  # Updated to match actual table name
 
-
+    def __str__(self):
+        return self.name
 class StaffMember(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
@@ -72,3 +77,15 @@ class StaffMember(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
+
+    def has_role(self, role_codes):
+        """
+        Check if user has any of the specified role codes
+        """
+        return self.role.code in role_codes
+
+    def get_role_permissions(self):
+        """
+        Get all permissions associated with the user's role
+        """
+        return self.role.permissions.all()

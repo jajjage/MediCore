@@ -7,6 +7,8 @@
     "fernet",
     "medicore",
     "myuser",
+    "patientaddress",
+    "patientdemographics",
     "psycopg",
     "pycache",
     "pylint",
@@ -14,6 +16,7 @@
     "simplejwt",
     "sqltools",
     "staffmember",
+    "staffrole",
     "venv"
   ],
   "git.ignoreLimitWarning": true,

@@ -10,7 +10,7 @@ class Patient(models.Model):
     last_name = models.CharField(max_length=100)
     date_of_birth = models.DateField()
     gender = models.CharField(max_length=50)
-    ssn = models.CharField(max_length=255, help_text="Encrypted SSN")
+    nin = models.CharField(max_length=255, help_text="Encrypted NIN")
     email = models.EmailField(unique=True)
     phone_primary = models.CharField(max_length=20)
     phone_secondary = models.CharField(max_length=20, blank=True, null=True)
@@ -18,20 +18,20 @@ class Patient(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    ssn_encrypted = models.CharField(max_length=255, blank=True, null=True)
+    nin_encrypted = models.CharField(max_length=255, blank=True, null=True)
 
     @property
-    def ssn(self):
-        if self.ssn_encrypted:
-            return field_encryption.decrypt(self.ssn_encrypted)
+    def nin(self):
+        if self.nin_encrypted:
+            return field_encryption.decrypt(self.nin_encrypted)
         return None
 
-    @ssn.setter
+    @nin.setter
     def ssn(self, value):
         if value:
-            self.ssn_encrypted = field_encryption.encrypt(value)
+            self.nin_encrypted = field_encryption.encrypt(value)
         else:
-            self.ssn_encrypted = None
+            self.nin_encrypted = None
 
     @encrypt_sensitive_fields(["ssn"])
     def save(self, *args, **kwargs):
