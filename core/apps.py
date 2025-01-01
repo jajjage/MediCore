@@ -1,4 +1,6 @@
 from django.apps import AppConfig
+from django.conf import settings
+from django.db import connection
 
 
 class CoreConfig(AppConfig):

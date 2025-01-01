@@ -34,6 +34,7 @@ class StaffMemberAdmin(UserAdmin):
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "department":
             hospital = self.get_tenant(request)
+            
             kwargs["queryset"] = Department.objects.filter(hospital=hospital)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
@@ -53,16 +54,56 @@ class DepartmentAdmin(admin.ModelAdmin):
     list_display = ('name', 'hospital')
     list_filter = ('hospital',)
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.is_superuser:
-            return qs
+    def get_form(self, request, obj=None, **kwargs):
+        """
+        Customize the form to associate the department with the current schema's hospital
+        and make the 'hospital' field readonly or hidden.
+        """
+        form = super().get_form(request, obj, **kwargs)
+        tenant_domain = get_tenant_domain_model().objects.get(domain=request.get_host().split(':')[0])
         
-        domain = get_tenant_domain_model().objects.get(domain=request.get_host().split(':')[0])
-        print(domain)
-        with schema_context(domain.tenant.schema_name):
-            hospital = HospitalProfile.objects.get(tenant_id=domain.tenant.id)
-            return qs.filter(hospital=hospital)
+        with schema_context(tenant_domain.tenant.schema_name):
+            hospital = HospitalProfile.objects.get(tenant_id=tenant_domain.tenant.id)
+        
+        # If the object is being created, set the hospital field to the current schema's hospital.
+        if not obj:
+            form.base_fields['hospital'].initial = hospital
+            form.base_fields['hospital'].widget.attrs['readonly'] = True
+            form.base_fields['hospital'].widget.attrs['disabled'] = True
+        else:
+            # If updating an existing department, set the hospital field to the current schema's hospital
+            form.base_fields['hospital'].initial = hospital
+            form.base_fields['hospital'].widget.attrs['readonly'] = True
+            form.base_fields['hospital'].widget.attrs['disabled'] = True
+
+        return form
+
+    def save_model(self, request, obj, form, change):
+        """
+        Automatically set the hospital field to the current schema's hospital during save.
+        """
+        if not change:  # If creating a new instance
+            tenant_domain = get_tenant_domain_model().objects.get(domain=request.get_host().split(':')[0])
+            with schema_context(tenant_domain.tenant.schema_name):
+                hospital = HospitalProfile.objects.get(tenant_id=tenant_domain.tenant.id)
+            obj.hospital = hospital
+        
+        # Ensure hospital is set correctly before saving
+        obj.save()
+
+        super().save_model(request, obj, form, change)
+
+    def get_queryset(self, request):
+        """
+        Ensure that the queryset only returns departments for the current hospital.
+        """
+        qs = super().get_queryset(request)
+        tenant_domain = get_tenant_domain_model().objects.get(domain=request.get_host().split(':')[0])
+        
+        with schema_context(tenant_domain.tenant.schema_name):
+            hospital = HospitalProfile.objects.get(tenant_id=tenant_domain.tenant.id)
+        
+        return qs.filter(hospital=hospital)
 
 @admin.register(StaffRole)
 class StaffRoleAdmin(admin.ModelAdmin):

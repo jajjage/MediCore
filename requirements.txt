@@ -2,10 +2,7 @@
 Django
 djangorestframework
 django-tenants  # Changed from django-tenant-schemas
-django-cors-headers
-djangorestframework-simplejwt
-djoser
-drf-nested-routers
+django-cors-headers 
 
 # Database
 psycopg2-binary
@@ -15,6 +12,8 @@ django-redis
 python-jose
 cryptography
 django-environ
+djoser
+djangorestframework-simplejwt
 
 # Development
 black

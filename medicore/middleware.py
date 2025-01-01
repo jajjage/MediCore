@@ -1,12 +1,13 @@
-# middleware.py
-class DebugTenantMiddleware:
+from django.db import connection
+from django.conf import settings
+
+class DynamicAuthModelMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        print(f"Incoming request host: {request.get_host()}")
-        print(f"Request META SERVER_NAME: {request.META.get('SERVER_NAME')}")
-        print(f"Request META HTTP_HOST: {request.META.get('HTTP_HOST')}")
-
-        response = self.get_response(request)
-        return response
+        if connection.schema_name == 'public':
+            settings.AUTH_USER_MODEL = settings.PUBLIC_SCHEMA_USER_MODEL
+        else:
+            settings.AUTH_USER_MODEL = settings.TENANT_SCHEMA_USER_MODEL
+        return self.get_response(request)

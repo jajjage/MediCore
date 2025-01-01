@@ -1,4 +1,5 @@
 import uuid
+from django.conf import settings
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
@@ -12,7 +13,7 @@ User = get_user_model()
 class HospitalProfile(models.Model):
     id= models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.OneToOneField(Client, on_delete=models.CASCADE)
-    admin_user = models.OneToOneField(User, on_delete=models.CASCADE)
+    admin_user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
     SUBSCRIPTION_CHOICES = [
         ("trial", "Trial"),
