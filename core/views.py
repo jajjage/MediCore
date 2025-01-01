@@ -1,6 +1,10 @@
 from django.shortcuts import render
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView # type: ignore
-from rest_framework_simplejwt.exceptions import TokenError, InvalidToken # type: ignore
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+    TokenVerifyView,
+)  # type: ignore
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken  # type: ignore
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -8,6 +12,7 @@ from django.conf import settings
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 class CookieTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
@@ -19,37 +24,34 @@ class CookieTokenObtainPairView(TokenObtainPairView):
             return response
         except Exception as e:
             logger.error(f"Token generation failed: {str(e)}")
-            return Response(
-                {"error": "Authentication failed"}, 
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
 
     def set_token_cookies(self, response):
         try:
             logger.debug(f"Setting cookies with data: {response.data}")
-            if 'access' not in response.data or 'refresh' not in response.data:
+            if "access" not in response.data or "refresh" not in response.data:
                 raise ValueError("Token data missing from response")
 
             # Set access token cookie
             response.set_cookie(
                 key=settings.JWT_AUTH_COOKIE,
-                value=response.data['access'],
-                max_age=settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds(),
+                value=response.data["access"],
+                max_age=settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(),
                 secure=settings.JWT_AUTH_SECURE,
                 httponly=settings.JWT_AUTH_HTTPONLY,
                 samesite=settings.JWT_AUTH_SAMESITE,
-                path='/'
+                path="/",
             )
 
             # Set refresh token cookie
             response.set_cookie(
                 key=settings.JWT_AUTH_REFRESH_COOKIE,
-                value=response.data['refresh'],
-                max_age=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
+                value=response.data["refresh"],
+                max_age=settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds(),
                 secure=settings.JWT_AUTH_SECURE,
                 httponly=settings.JWT_AUTH_HTTPONLY,
                 samesite=settings.JWT_AUTH_SAMESITE,
-                path='/'
+                path="/",
             )
 
             # Remove tokens from response data for security
@@ -61,62 +63,53 @@ class CookieTokenObtainPairView(TokenObtainPairView):
             logger.error(f"Failed to set cookies: {str(e)}")
             return Response(
                 {"error": "Failed to set authentication cookies"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
 
 class CookieTokenRefreshView(TokenRefreshView):
     def post(self, request, *args, **kwargs):
         refresh_token = request.COOKIES.get(settings.JWT_AUTH_REFRESH_COOKIE)
-        
+
         if not refresh_token:
-            return Response(
-                {"error": "No refresh token found"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-            
+            return Response({"error": "No refresh token found"}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            request.data['refresh'] = refresh_token
+            request.data["refresh"] = refresh_token
             response = super().post(request, *args, **kwargs)
-            
+
             if response.status_code == 200:
                 response.set_cookie(
                     settings.JWT_AUTH_COOKIE,
-                    response.data['access'],
-                    max_age=settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds(),
+                    response.data["access"],
+                    max_age=settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(),
                     httponly=settings.JWT_AUTH_HTTPONLY,
                     samesite=settings.JWT_AUTH_SAMESITE,
-                    secure=settings.JWT_AUTH_SECURE
+                    secure=settings.JWT_AUTH_SECURE,
                 )
-                del response.data['access']
-                
+                del response.data["access"]
+
             return response
-            
+
         except TokenError as e:
             logger.error(f"Token refresh error: {str(e)}")
-            return Response(
-                {"error": "Invalid token"}, 
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+
 
 class CookieTokenVerifyView(TokenVerifyView):
     def post(self, request, *args, **kwargs):
         token = request.COOKIES.get(settings.JWT_AUTH_COOKIE)
-        
+
         if not token:
-            return Response(
-                {"error": "No token found"}, 
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-            
+            return Response({"error": "No token found"}, status=status.HTTP_401_UNAUTHORIZED)
+
         try:
-            request.data['token'] = token
+            request.data["token"] = token
             return super().post(request, *args, **kwargs)
         except InvalidToken as e:
             logger.error(f"Token verification error: {str(e)}")
-            return Response(
-                {"error": "Invalid token"}, 
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+
 
 class LogoutView(APIView):
     def post(self, request, *args, **kwargs):
@@ -127,7 +120,4 @@ class LogoutView(APIView):
             return response
         except Exception as e:
             logger.error(f"Logout error: {str(e)}")
-            return Response(
-                {"error": "Logout failed"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Logout failed"}, status=status.HTTP_400_BAD_REQUEST)

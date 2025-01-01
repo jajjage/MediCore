@@ -1,58 +1,60 @@
 from rest_framework.permissions import BasePermission
 
 ROLE_PERMISSIONS = {
-    'DOCTOR': {
-        'patient': ['view', 'add', 'change'],
-        'patientdemographics': ['view', 'add', 'change'],
-        'patientaddress': ['view'],
+    "DOCTOR": {
+        "patient": ["view", "add", "change"],
+        "patientdemographics": ["view", "add", "change"],
+        "patientaddress": ["view"],
     },
-    'HEAD_DOCTOR': {
-        'patient': ['view', 'add', 'change', 'delete'],
-        'patientdemographics': ['view', 'add', 'change', 'delete'],
-        'patientaddress': ['view', 'delete'],
+    "HEAD_DOCTOR": {
+        "patient": ["view", "add", "change", "delete"],
+        "patientdemographics": ["view", "add", "change", "delete"],
+        "patientaddress": ["view", "delete"],
     },
-    'NURSE': {
-        'patient': ['view'],
-        'patientdemographics': ['view', 'add', 'change'],
-        'patientaddress': ['view'],
+    "NURSE": {
+        "patient": ["view"],
+        "patientdemographics": ["view", "add", "change"],
+        "patientaddress": ["view"],
     },
-    'HEAD_NURSE': {
-        'patient': ['view', 'add'],
-        'patientdemographics': ['view', 'add', 'change', 'delete'],
-        'patientaddress': ['view'],
+    "HEAD_NURSE": {
+        "patient": ["view", "add"],
+        "patientdemographics": ["view", "add", "change", "delete"],
+        "patientaddress": ["view"],
     },
-    'RECEPTIONIST': {
-        'patient': ['view', 'add'],
-        'patientdemographics': ['view'],
-        'patientaddress': ['view', 'add', 'change'],
+    "RECEPTIONIST": {
+        "patient": ["view", "add"],
+        "patientdemographics": ["view"],
+        "patientaddress": ["view", "add", "change"],
     },
-    'LAB_TECHNICIAN': {
-        'patient': ['view'],
-        'patientdemographics': ['view'],
+    "LAB_TECHNICIAN": {
+        "patient": ["view"],
+        "patientdemographics": ["view"],
     },
-    'PHARMACIST': {
-        'patient': ['view'],
-        'patientdemographics': ['view'],
+    "PHARMACIST": {
+        "patient": ["view"],
+        "patientdemographics": ["view"],
     },
 }
+
 
 class RolePermission(BasePermission):
     """
     Custom permission to check user roles and their permissions.
     """
+
     def __init__(self):
         super().__init__()
         print("RolePermission initialized")
-    
+
     def has_permission(self, request, view):
-    # Extract and normalize the user role
-        raw_role = getattr(request.user, 'role', None)
+        # Extract and normalize the user role
+        raw_role = getattr(request.user, "role", None)
         if not raw_role:
             print("User role is not set.")
             return False
 
         # Extract role as string
-        user_role = str(raw_role).strip().upper().replace(' ', '_')
+        user_role = str(raw_role).strip().upper().replace(" ", "_")
         print(f"Extracted and normalized user role: {user_role}")
 
         # Check if role is in ROLE_PERMISSIONS
@@ -62,17 +64,17 @@ class RolePermission(BasePermission):
             return False
 
         # Determine resource and action
-        resource = view.basename.rstrip('s')  # Normalize resource name
+        resource = view.basename.rstrip("s")  # Normalize resource name
         action = view.action
 
         # Map DRF actions to permissions
         action_to_permission = {
-            'list': 'view',
-            'retrieve': 'view',
-            'create': 'add',
-            'update': 'change',
-            'partial_update': 'change',
-            'destroy': 'delete',
+            "list": "view",
+            "retrieve": "view",
+            "create": "add",
+            "update": "change",
+            "partial_update": "change",
+            "destroy": "delete",
         }
         permission = action_to_permission.get(action)
         if not permission:

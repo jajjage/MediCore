@@ -17,6 +17,7 @@ djangorestframework-simplejwt
 
 # Development
 black
+ruff
 pylint
 pytest
 pytest-django

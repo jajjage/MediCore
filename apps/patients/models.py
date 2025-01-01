@@ -1,6 +1,8 @@
-from django.db import models
 import uuid
-from utils.encryption import field_encryption, encrypt_sensitive_fields
+
+from django.db import models
+
+from utils.encryption import encrypt_sensitive_fields, field_encryption
 
 
 class Patient(models.Model):
@@ -21,12 +23,12 @@ class Patient(models.Model):
     nin_encrypted = models.CharField(max_length=255, blank=True, null=True)
 
     @property
-    def nin(self):
+    def nin_number(self):
         if self.nin_encrypted:
             return field_encryption.decrypt(self.nin_encrypted)
         return None
 
-    @nin.setter
+    @nin_number.setter
     def ssn(self, value):
         if value:
             self.nin_encrypted = field_encryption.encrypt(value)
@@ -43,21 +45,14 @@ class Patient(models.Model):
             models.Index(fields=["email"]),
             models.Index(fields=["last_name", "first_name"]),
         ]
-    
 
 
 class PatientDemographics(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    patient = models.OneToOneField(
-        Patient, on_delete=models.CASCADE, related_name="demographics"
-    )
+    patient = models.OneToOneField(Patient, on_delete=models.CASCADE, related_name="demographics")
     blood_type = models.CharField(max_length=5, blank=True, null=True)
-    height_cm = models.DecimalField(
-        max_digits=5, decimal_places=2, blank=True, null=True
-    )
-    weight_kg = models.DecimalField(
-        max_digits=5, decimal_places=2, blank=True, null=True
-    )
+    height_cm = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
+    weight_kg = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
     allergies = models.JSONField(default=list, blank=True)
     chronic_conditions = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -65,7 +60,7 @@ class PatientDemographics(models.Model):
 
     class Meta:
         db_table = "patient_demographics"
-        
+
         permissions = [
             ("view_patient", "Can view patient"),
             ("view_patient_demographics", "Can view patient demographics"),
@@ -74,9 +69,7 @@ class PatientDemographics(models.Model):
 
 class PatientAddress(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    patient = models.ForeignKey(
-        Patient, on_delete=models.CASCADE, related_name="addresses"
-    )
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="addresses")
     address_type = models.CharField(max_length=50)  # home, work, etc.
     street_address1 = models.CharField(max_length=255)
     street_address2 = models.CharField(max_length=255, blank=True, null=True)
@@ -93,7 +86,7 @@ class PatientAddress(models.Model):
         indexes = [
             models.Index(fields=["postal_code"]),
         ]
-        
+
         permissions = [
             ("view_patient", "Can view patient"),
             ("view_patient_address", "Can view patient address"),

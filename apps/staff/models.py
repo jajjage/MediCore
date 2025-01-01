@@ -8,10 +8,11 @@ from django.contrib.auth.models import (
     PermissionsMixin,
 )
 
+
 class StaffManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
-            raise ValueError('Email is required')
+            raise ValueError("Email is required")
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
@@ -19,34 +20,35 @@ class StaffManager(BaseUserManager):
         return user
 
     def create_superuser(self, email, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
         return self.create_user(email, password, **extra_fields)
+
 
 class Department(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
-    hospital = models.ForeignKey('hospital.HospitalProfile', on_delete=models.CASCADE, null=True, blank=True)
+    hospital = models.ForeignKey("hospital.HospitalProfile", on_delete=models.CASCADE, null=True, blank=True)
+
     def __str__(self):
         return self.name
+
     class Meta:
         db_table = "department"
-    
+
+
 class StaffRole(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=50, unique=True)
-    permissions = models.ManyToManyField(
-        'auth.Permission',
-        blank=True,
-        related_name='staff_roles'
-    )
-    
+    permissions = models.ManyToManyField("auth.Permission", blank=True, related_name="staff_roles")
+
     class Meta:
         db_table = "staff_staffrole"
 
     def __str__(self):
         return self.name
+
 
 class StaffMember(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -65,18 +67,18 @@ class StaffMember(AbstractUser):
     objects = StaffManager()
 
     groups = models.ManyToManyField(
-        'auth.Group',
-        related_name='staff_members',
+        "auth.Group",
+        related_name="staff_members",
         blank=True,
-        help_text='The groups this user belongs to.',
-        verbose_name='groups',
+        help_text="The groups this user belongs to.",
+        verbose_name="groups",
     )
     user_permissions = models.ManyToManyField(
-        'auth.Permission',
-        related_name='staff_members',
+        "auth.Permission",
+        related_name="staff_members",
         blank=True,
-        help_text='Specific permissions for this user.',
-        verbose_name='user permissions',
+        help_text="Specific permissions for this user.",
+        verbose_name="user permissions",
     )
 
     class Meta:

@@ -1,16 +1,58 @@
-[tool.black]
-line-length = 88  # Adjust this to your preferred line length (default is 88)
-target-version = ['py39', 'py310', 'py311', 'py312',]  # Target Python versions
-skip-string-normalization = false  # If true, Black won't normalize string quotes
-exclude = '''
-/(
-    \.venv
-    | \.env
-    | \.git
-    | \.mypy_cache
-    | \.tox
-    | \.pytest_cache
-    | build
-    | dist
-)/
-'''
+ [tool.ruff]
+        
+        # Exclude a variety of commonly ignored directories.
+        exclude = [
+            ".bzr",
+            ".direnv",
+            ".eggs",
+            ".git",
+            ".git-rewrite",
+            ".hg",
+            ".ipynb_checkpoints",
+            ".mypy_cache",
+            ".nox",
+            ".pants.d",
+            ".pyenv",
+            ".pytest_cache",
+            ".pytype",
+            ".ruff_cache",
+            ".svn",
+            ".tox",
+            ".venv",
+            ".vscode",
+            "__pypackages__",
+            "_build",
+            "buck-out",
+            "build",
+            "dist",
+            "node_modules",
+            "site-packages",
+            "venv",
+            "__init__.py",
+        ]
+        
+        include = ["*.py"]
+        line-length = 120
+        indent-width = 4
+        # Always generate Python 3.7-compatible code.
+        target-version = "py37"
+        
+        [tool.ruff.lint]
+        fixable = ["ALL"]
+        
+        # Allow unused variables when underscore-prefixed.
+        dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+        
+        [tool.ruff.format]
+        
+        # Like Black, use double quotes for strings.
+        quote-style = "double"
+        
+        # Like Black, indent with spaces, rather than tabs.
+        indent-style = "space"
+        
+        # Like Black, respect magic trailing commas.
+        skip-magic-trailing-comma = false
+        
+        # Like Black, automatically detect the appropriate line ending.
+        line-ending = "auto"

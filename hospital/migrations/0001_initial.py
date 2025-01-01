@@ -7,34 +7,60 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('tenants', '__first__'),
+        ("tenants", "__first__"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='HospitalProfile',
+            name="HospitalProfile",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('subscription_plan', models.CharField(choices=[('trial', 'Trial'), ('basic', 'Basic'), ('premium', 'Premium')], max_length=20)),
-                ('hospital_name', models.CharField(max_length=200)),
-                ('license_number', models.CharField(max_length=100, unique=True)),
-                ('contact_email', models.EmailField(max_length=254)),
-                ('contact_phone', models.CharField(max_length=20)),
-                ('address', models.TextField(blank=True)),
-                ('specialty', models.CharField(blank=True, max_length=100)),
-                ('bed_capacity', models.PositiveIntegerField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('admin_user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-                ('tenant', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to='tenants.client')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "subscription_plan",
+                    models.CharField(
+                        choices=[
+                            ("trial", "Trial"),
+                            ("basic", "Basic"),
+                            ("premium", "Premium"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                ("hospital_name", models.CharField(max_length=200)),
+                ("license_number", models.CharField(max_length=100, unique=True)),
+                ("contact_email", models.EmailField(max_length=254)),
+                ("contact_phone", models.CharField(max_length=20)),
+                ("address", models.TextField(blank=True)),
+                ("specialty", models.CharField(blank=True, max_length=100)),
+                ("bed_capacity", models.PositiveIntegerField(blank=True, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "admin_user",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "tenant",
+                    models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to="tenants.client"),
+                ),
             ],
             options={
-                'db_table': 'hospital_profile',
+                "db_table": "hospital_profile",
             },
         ),
     ]

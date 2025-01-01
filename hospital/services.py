@@ -5,12 +5,13 @@ from .models import HospitalProfile
 from tenants.models import Client, Domain
 from django.db import connection, transaction
 
+
 class TenantCreationService:
     @staticmethod
     def get_user_model():
-        if connection.schema_name == 'public':
-            return apps.get_model('core', 'MyUser')
-        return apps.get_model('staff', 'StaffMember')
+        if connection.schema_name == "public":
+            return apps.get_model("core", "MyUser")
+        return apps.get_model("staff", "StaffMember")
 
     @staticmethod
     @transaction.atomic
@@ -29,10 +30,7 @@ class TenantCreationService:
         )
 
         # Create domain
-        domain_name = (
-            f"{validated_data['hospital_name'].lower().replace(' ', '-')}"
-            f".{settings.BASE_DOMAIN}"
-        )
+        domain_name = f"{validated_data['hospital_name'].lower().replace(' ', '-')}" f".{settings.BASE_DOMAIN}"
         Domain.objects.create(domain=domain_name, tenant=tenant, is_primary=True)
 
         # Create admin user

@@ -7,15 +7,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class MultiSchemaModelBackend(ModelBackend):
     def authenticate(self, request, username=None, password=None, **kwargs):
         logger.info(f"Authentication attempt - Schema: {connection.schema_name}")
         logger.info(f"Request data: {request.data if hasattr(request, 'data') else 'No data'}")
-        
+
         # Handle empty username cases
-        if not username and hasattr(request, 'data'):
-            username = request.data.get('email')
-            
+        if not username and hasattr(request, "data"):
+            username = request.data.get("email")
+
         if not username or not password:
             logger.error("Missing credentials - username or password is None")
             return None

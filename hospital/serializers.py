@@ -34,7 +34,7 @@ class CreateTenantRequestSerializer(serializers.Serializer):
     # Admin user data
     admin_email = serializers.EmailField()
     admin_password = serializers.CharField(min_length=8, write_only=True)
-   
+
     # Hospital profile data
     hospital_name = serializers.CharField(max_length=200)
     license_number = serializers.CharField(max_length=100)

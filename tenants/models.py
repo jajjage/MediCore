@@ -5,7 +5,7 @@ from django_tenants.models import TenantMixin, DomainMixin
 
 
 class Client(TenantMixin):
-    id= models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     paid_until = models.DateField()
     on_trial = models.BooleanField(default=True)
@@ -26,7 +26,7 @@ class Client(TenantMixin):
 
 
 class Domain(DomainMixin):
-    id= models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Client, on_delete=models.CASCADE)
 
     def __str__(self):

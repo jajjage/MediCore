@@ -33,7 +33,6 @@ DEFAULT_APPS = [
     "djoser",
     "rest_framework_simplejwt",
     "corsheaders",
-    
 ]
 
 # Apps that are specific to individual tenants
@@ -59,7 +58,7 @@ SHARED_APPS = [
 INSTALLED_APPS = list(set(SHARED_APPS) | set(TENANT_APPS))
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     "django_tenants.middleware.main.TenantMainMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -70,7 +69,7 @@ MIDDLEWARE = [
     "core.middleware.AdminAccessMiddleware",
     "core.middleware.JWTRefreshMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    'medicore.middleware.DynamicAuthModelMiddleware',
+    "medicore.middleware.DynamicAuthModelMiddleware",
 ]
 
 ROOT_URLCONF = "medicore.urls"
@@ -140,46 +139,45 @@ AUTH_PASSWORD_VALIDATORS = [
 BASE_DOMAIN = "medicore.local"
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
+    "DEFAULT_AUTHENTICATION_CLASSES": [
         "core.authentication.RobustCookieJWTAuthentication",
     ],
-    
-    'DEFAULT_PERMISSION_CLASSES': [
-        'apps.patients.permissions.RolePermission',
+    "DEFAULT_PERMISSION_CLASSES": [
+        "apps.patients.permissions.RolePermission",
     ],
 }
 
 
-JWT_AUTH_COOKIE = 'access_token'
-JWT_AUTH_REFRESH_COOKIE = 'refresh_token'
+JWT_AUTH_COOKIE = "access_token"
+JWT_AUTH_REFRESH_COOKIE = "refresh_token"
 JWT_AUTH_SECURE = False
-JWT_AUTH_SAMESITE = 'Lax'
+JWT_AUTH_SAMESITE = "Lax"
 JWT_AUTH_HTTPONLY = True
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    'AUTH_COOKIE': JWT_AUTH_COOKIE,
-    'AUTH_COOKIE_REFRESH': JWT_AUTH_REFRESH_COOKIE,
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "AUTH_COOKIE": JWT_AUTH_COOKIE,
+    "AUTH_COOKIE_REFRESH": JWT_AUTH_REFRESH_COOKIE,
 }
 # Tenant vs Public Schema User Model Configuration
-PUBLIC_SCHEMA_USER_MODEL = 'core.MyUser'
-TENANT_SCHEMA_USER_MODEL = 'staff.StaffMember'
+PUBLIC_SCHEMA_USER_MODEL = "core.MyUser"
+TENANT_SCHEMA_USER_MODEL = "staff.StaffMember"
 
 
 DJOSER = {
-    'LOGIN_FIELD': 'email',
-    'SERIALIZERS': {
-        'user_create': 'apps.staff.serializers.TenantStaffCreateSerializer',
-        'user': 'apps.staff.serializers.StaffSerializer',
-        'current_user': 'apps.staff.serializers.StaffSerializer',
+    "LOGIN_FIELD": "email",
+    "SERIALIZERS": {
+        "user_create": "apps.staff.serializers.TenantStaffCreateSerializer",
+        "user": "apps.staff.serializers.StaffSerializer",
+        "current_user": "apps.staff.serializers.StaffSerializer",
     },
 }
 
 # Custom authentication backend
 AUTHENTICATION_BACKENDS = (
-    'core.backends.MultiSchemaModelBackend',
-    'django.contrib.auth.backends.ModelBackend',
+    "core.backends.MultiSchemaModelBackend",
+    "django.contrib.auth.backends.ModelBackend",
 )
 
 LANGUAGE_CODE = "en-us"
@@ -200,7 +198,7 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-AUTH_USER_MODEL = 'core.MyUser'
+AUTH_USER_MODEL = "core.MyUser"
 
 
 TENANT_MODEL = "tenants.Client"
@@ -209,22 +207,22 @@ PUBLIC_SCHEMA_NAME = "public"
 
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
         },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': 'debug.log',
+        "file": {
+            "class": "logging.FileHandler",
+            "filename": "debug.log",
         },
     },
-    'loggers': {
-        'core.authentication': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-            'propagate': True,
+    "loggers": {
+        "core.authentication": {
+            "handlers": ["console", "file"],
+            "level": "DEBUG",
+            "propagate": True,
         },
     },
 }
@@ -238,17 +236,17 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Ensure cookies are allowed
 CORS_ALLOW_HEADERS = [
-    'content-type',
-    'authorization',
-    'x-csrftoken',
-    'x-requested-with',
-    'accept',
-    'origin',
-    'access-control-allow-origin',
-    'access-control-allow-credentials',
+    "content-type",
+    "authorization",
+    "x-csrftoken",
+    "x-requested-with",
+    "accept",
+    "origin",
+    "access-control-allow-origin",
+    "access-control-allow-credentials",
 ]
 
 # Ensure cookies are allowed in responses
 CORS_EXPOSE_HEADERS = [
-    'Set-Cookie',
+    "Set-Cookie",
 ]

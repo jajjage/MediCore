@@ -1,5 +1,5 @@
-from rest_framework_simplejwt.authentication import JWTAuthentication # type: ignore
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError # type: ignore
+from rest_framework_simplejwt.authentication import JWTAuthentication  # type: ignore
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError  # type: ignore
 from django.conf import settings
 from django.db import connection
 import logging
@@ -7,6 +7,7 @@ from .exceptions import TokenMissing
 from django_tenants.utils import get_public_schema_name
 
 logger = logging.getLogger(__name__)
+
 
 class RobustCookieJWTAuthentication(JWTAuthentication):
     def authenticate(self, request):
@@ -37,10 +38,10 @@ class RobustCookieJWTAuthentication(JWTAuthentication):
                 # Validate user for current schema
                 schema_name = connection.schema_name
                 if schema_name == get_public_schema_name():
-                    if not user._meta.model.__name__ == 'MyUser':
+                    if not user._meta.model.__name__ == "MyUser":
                         raise TokenError("Invalid user type for public schema")
                 else:
-                    if not user._meta.model.__name__ == 'StaffMember':
+                    if not user._meta.model.__name__ == "StaffMember":
                         raise TokenError("Invalid user type for tenant schema")
 
                 return user, validated_token
