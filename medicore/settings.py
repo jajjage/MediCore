@@ -140,13 +140,13 @@ AUTH_PASSWORD_VALIDATORS = [
 BASE_DOMAIN = "medicore.local"
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
+    'DEFAULT_AUTHENTICATION_CLASSES': [
         "core.authentication.RobustCookieJWTAuthentication",
-    ),
-    'EXCEPTION_HANDLER': 'core.utils.custom_exception_handler',
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
-    ),
+    ],
+    
+    'DEFAULT_PERMISSION_CLASSES': [
+        'apps.patients.permissions.RolePermission',
+    ],
 }
 
 

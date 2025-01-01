@@ -1,3 +1,3 @@
-DELETE FROM public.tenants_client WHERE id = 13;
--- DELETE FROM public.hospital_profile WHERE id = ;
-DELETE FROM public.tenants_domain WHERE id = 5;
+-- DELETE FROM public.core_user WHERE is_superuser = False;
+-- DELETE FROM public.hospital_profile WHERE subscription_plan = 'premium';
+DELETE FROM public.tenants_client WHERE on_trial = True;

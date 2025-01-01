@@ -43,6 +43,7 @@ class Patient(models.Model):
             models.Index(fields=["email"]),
             models.Index(fields=["last_name", "first_name"]),
         ]
+    
 
 
 class PatientDemographics(models.Model):
@@ -64,6 +65,11 @@ class PatientDemographics(models.Model):
 
     class Meta:
         db_table = "patient_demographics"
+        
+        permissions = [
+            ("view_patient", "Can view patient"),
+            ("view_patient_demographics", "Can view patient demographics"),
+        ]
 
 
 class PatientAddress(models.Model):
@@ -86,4 +92,9 @@ class PatientAddress(models.Model):
         db_table = "patient_addresses"
         indexes = [
             models.Index(fields=["postal_code"]),
+        ]
+        
+        permissions = [
+            ("view_patient", "Can view patient"),
+            ("view_patient_address", "Can view patient address"),
         ]
