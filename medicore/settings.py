@@ -113,12 +113,19 @@ DATABASES = {
 DATABASE_ROUTERS = ("django_tenants.routers.TenantSyncRouter",)
 
 
-# CACHES = {
-#     "default": {
-#         'KEY_FUNCTION': 'django_tenants.cache.make_key',
-#         'REVERSE_KEY_FUNCTION': 'django_tenants.cache.reverse_key',
-#     },
-# }
+# settings.py
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',  # Redis URL
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        },
+        'KEY_PREFIX': 'medicore'  # Optional, helps avoid key collisions
+    }
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
