@@ -1,15 +1,15 @@
-from django.shortcuts import render
-from rest_framework_simplejwt.views import (
+import logging
+
+from django.conf import settings
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import InvalidToken  # type: ignore
+from rest_framework_simplejwt.views import (  # type: ignore
     TokenObtainPairView,
     TokenRefreshView,
     TokenVerifyView,
 )  # type: ignore
-from rest_framework_simplejwt.exceptions import TokenError, InvalidToken  # type: ignore
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.conf import settings
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -68,33 +68,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
 
 
 class CookieTokenRefreshView(TokenRefreshView):
-    def post(self, request, *args, **kwargs):
-        refresh_token = request.COOKIES.get(settings.JWT_AUTH_REFRESH_COOKIE)
-
-        if not refresh_token:
-            return Response({"error": "No refresh token found"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            request.data["refresh"] = refresh_token
-            response = super().post(request, *args, **kwargs)
-
-            if response.status_code == 200:
-                response.set_cookie(
-                    settings.JWT_AUTH_COOKIE,
-                    response.data["access"],
-                    max_age=settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(),
-                    httponly=settings.JWT_AUTH_HTTPONLY,
-                    samesite=settings.JWT_AUTH_SAMESITE,
-                    secure=settings.JWT_AUTH_SECURE,
-                )
-                del response.data["access"]
-
-            return response
-
-        except TokenError as e:
-            logger.error(f"Token refresh error: {str(e)}")
-            return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
-
+   pass
 
 class CookieTokenVerifyView(TokenVerifyView):
     def post(self, request, *args, **kwargs):

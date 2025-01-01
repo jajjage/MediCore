@@ -1,6 +1,7 @@
-from pathlib import Path
-import environ
 from datetime import timedelta
+from pathlib import Path
+
+import environ
 
 env = environ.Env()
 
@@ -18,7 +19,8 @@ ENCRYPTION_KEY = env("ENCRYPTION_KEY", default="")
 DEBUG = env("DEBUG", default=True)
 
 ALLOWED_HOSTS = env("ALLOWED_HOSTS", default="*").split(",")
-
+BASE_URL= env("BASE_URL", default="http://.medicore.local:8000/api/v1/")
+print(BASE_URL)
 # Application definition
 # List of default Django apps and third-party apps that are common to both shared and tenant apps
 DEFAULT_APPS = [
@@ -66,8 +68,8 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "core.middleware.AdminAccessMiddleware",
-    "core.middleware.JWTRefreshMiddleware",
+    "medicore.middleware.AdminAccessMiddleware",
+    "medicore.middleware.JWTRefreshMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "medicore.middleware.DynamicAuthModelMiddleware",
 ]
@@ -140,7 +142,7 @@ BASE_DOMAIN = "medicore.local"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "core.authentication.RobustCookieJWTAuthentication",
+        "medicore.authentication.RobustCookieJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "apps.patients.permissions.RolePermission",
@@ -150,13 +152,16 @@ REST_FRAMEWORK = {
 
 JWT_AUTH_COOKIE = "access_token"
 JWT_AUTH_REFRESH_COOKIE = "refresh_token"
+JWT_REFRESH_THRESHOLD = 300  # 5 minutes in seconds
+JWT_ACCESS_TOKEN_LIFETIME = timedelta(minutes=15)
+JWT_REFRESH_TOKEN_LIFETIME = timedelta(days=1)
 JWT_AUTH_SECURE = False
 JWT_AUTH_SAMESITE = "Lax"
 JWT_AUTH_HTTPONLY = True
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": JWT_ACCESS_TOKEN_LIFETIME,
+    "REFRESH_TOKEN_LIFETIME": JWT_REFRESH_TOKEN_LIFETIME,
     "AUTH_COOKIE": JWT_AUTH_COOKIE,
     "AUTH_COOKIE_REFRESH": JWT_AUTH_REFRESH_COOKIE,
 }
@@ -164,6 +169,20 @@ SIMPLE_JWT = {
 PUBLIC_SCHEMA_USER_MODEL = "core.MyUser"
 TENANT_SCHEMA_USER_MODEL = "staff.StaffMember"
 
+# Add API settings
+API_VERSION = 'v1'
+API_BASE_PATH = f'/api/{API_VERSION}'
+SITE_DOMAIN = 'medicore.local'
+SITE_SCHEME = 'http' if DEBUG else 'https'
+API_TIMEOUT = 5
+API_MAX_RETRIES = 3
+LOCAL_PORT = 8000 if DEBUG else 80
+# JWT settings
+JWT_AUTH_ENDPOINTS = {
+    'refresh': f'{API_BASE_PATH}/auth/token/refresh/',
+    'verify': f'{API_BASE_PATH}/auth/token/verify/',
+    'obtain': f'{API_BASE_PATH}/auth/token/',
+}
 
 DJOSER = {
     "LOGIN_FIELD": "email",
@@ -176,7 +195,7 @@ DJOSER = {
 
 # Custom authentication backend
 AUTHENTICATION_BACKENDS = (
-    "core.backends.MultiSchemaModelBackend",
+    "medicore.backends.MultiSchemaModelBackend",
     "django.contrib.auth.backends.ModelBackend",
 )
 

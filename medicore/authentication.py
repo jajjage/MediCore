@@ -1,10 +1,10 @@
-from rest_framework_simplejwt.authentication import JWTAuthentication  # type: ignore
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError  # type: ignore
+import logging
+
 from django.conf import settings
 from django.db import connection
-import logging
-from .exceptions import TokenMissing
 from django_tenants.utils import get_public_schema_name
+from rest_framework_simplejwt.authentication import JWTAuthentication  # type: ignore
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ class RobustCookieJWTAuthentication(JWTAuthentication):
 
                 # Validate user for current schema
                 schema_name = connection.schema_name
+                
                 if schema_name == get_public_schema_name():
                     if not user._meta.model.__name__ == "MyUser":
                         raise TokenError("Invalid user type for public schema")

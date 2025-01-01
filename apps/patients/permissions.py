@@ -78,16 +78,16 @@ class RolePermission(BasePermission):
         }
         permission = action_to_permission.get(action)
         if not permission:
-            print(f"Action '{action}' is not defined in action_to_permission.")
+            # print(f"Action '{action}' is not defined in action_to_permission.")
             return False
 
-        print(f"Permission needed: {permission}")
+        # print(f"Permission needed: {permission}")
 
         # Check if the user's role has the required permission
         allowed_permissions = ROLE_PERMISSIONS.get(user_role, {}).get(resource, [])
         if permission in allowed_permissions:
-            print(f"Permission granted for {user_role} to {action} {resource}.")
+            # print(f"Permission granted for {user_role} to {action} {resource}.")
             return True
 
-        print(f"Permission denied for {user_role} to {action} {resource}.")
+        # print(f"Permission denied for {user_role} to {action} {resource}.")
         return False
