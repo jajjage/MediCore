@@ -1,12 +1,10 @@
 import uuid
-from django.db import models
-from django_tenants.utils import schema_context, get_tenant
-from django.contrib.auth.models import Permission, Group
+
 from django.contrib.auth.models import (
     AbstractUser,
     BaseUserManager,
-    PermissionsMixin,
 )
+from django.db import models
 
 
 class StaffManager(BaseUserManager):
@@ -53,6 +51,7 @@ class StaffRole(models.Model):
 class StaffMember(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
+    hospital = models.ForeignKey("hospital.HospitalProfile", on_delete=models.CASCADE, null=True, blank=True)   
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     role = models.ForeignKey(StaffRole, on_delete=models.SET_NULL, null=True)

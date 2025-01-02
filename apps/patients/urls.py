@@ -17,3 +17,5 @@ urlpatterns = [
     path("", include(router.urls)),
     path("", include(patient_router.urls)),
 ]
+
+# print(patient_router.urls)

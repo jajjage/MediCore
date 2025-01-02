@@ -1,49 +1,52 @@
-from rest_framework.viewsets import ModelViewSet
+# from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
+from rest_framework.viewsets import ModelViewSet
 
-from .models import Patient, PatientDemographics, PatientAddress
+from .models import Patient, PatientAddress, PatientDemographics
+from .permissions import ROLE_PERMISSIONS, RolePermission
 from .serializers import (
-    PatientSerializer,
-    PatientListSerializer,
-    PatientDemographicsSerializer,
     PatientAddressSerializer,
+    PatientDemographicsSerializer,
+    PatientListCreateSerializer,
 )
-from .permissions import RolePermission
 
 
 class PatientViewSet(ModelViewSet):
     """
     ViewSet for Patient model with role-based permissions.
     """
-
-    queryset = Patient.objects.all()
+    serializer_class = PatientListCreateSerializer
     permission_classes = [RolePermission]
 
-    def get_serializer_class(self):
-        if self.action == "list":
-            return PatientListSerializer
-        return PatientSerializer
+    def get_queryset(self):
+        return Patient.objects.select_related('demographics').prefetch_related('addresses')
 
-    @action(detail=True, methods=["get"], permission_classes=[RolePermission])
-    def demographics(self, request, pk=None):
-        """
-        Retrieve patient demographics.
-        """
-        patient = self.get_object()
-        demographics = get_object_or_404(PatientDemographics, patient=patient)
-        serializer = PatientDemographicsSerializer(demographics)
-        return Response(serializer.data)
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
 
-    @action(detail=True, methods=["get"], permission_classes=[RolePermission])
-    def addresses(self, request, pk=None):
-        """
-        Retrieve patient addresses.
-        """
+    @action(detail=True, methods=['patch'])
+    def update_demographics(self, request, pk=None):
         patient = self.get_object()
-        addresses = PatientAddress.objects.filter(patient=patient)
-        serializer = PatientAddressSerializer(addresses, many=True)
+        user_role = request.user.role
+        permissions = ROLE_PERMISSIONS.get(user_role, {})
+
+        if 'add' not in permissions.get('patientdemographics', []):
+            return Response(
+                {"error": "You don't have permission to update demographics"},
+                status=403
+            )
+
+        serializer = PatientDemographicsSerializer(
+            patient.demographics,
+            data=request.data,
+            partial=True,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return Response(serializer.data)
 
 
@@ -54,8 +57,10 @@ class PatientDemographicsViewSet(ModelViewSet):
 
     serializer_class = PatientDemographicsSerializer
     permission_classes = [RolePermission]
-
+    
     def get_queryset(self):
+        pk = self.kwargs.get("patient_pk")
+        print(pk)
         return PatientDemographics.objects.filter(patient_id=self.kwargs.get("patient_pk"))
 
     def perform_create(self, serializer):

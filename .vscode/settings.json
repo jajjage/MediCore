@@ -12,6 +12,8 @@
     "medicore",
     "myuser",
     "patientaddress",
+    "patientaddresss",
+    "patientdemographic",
     "patientdemographics",
     "psycopg",
     "pycache",

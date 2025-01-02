@@ -131,7 +131,14 @@ class JWTRefreshMiddleware:
         if attempts >= self.max_refresh_attempts:
             logger.warning(f"Too many refresh attempts for token {attempts}")
             self._clear_auth_cookies(request)
-            return
+            
+            # if refresh_token:
+            #     cache.set(cache_key, attempts + 1, self.refresh_attempt_cache_timeout)
+            #     url = request.get_host().split(":")[0]
+            #     tenant_domain = url.split(".")[0]
+            #     new_tokens = self._get_new_tokens(tenant_domain, refresh_token)
+            #     if new_tokens:
+            #         self._update_request_tokens(request, new_tokens)
 
         cache.set(cache_key, attempts + 1, self.refresh_attempt_cache_timeout)
         url = request.get_host().split(":")[0]
@@ -184,6 +191,8 @@ class JWTRefreshMiddleware:
 
     def _set_response_cookies(self, request, response):
         """Set secure cookies in response"""
+        
+        # print(f"Adding new token to cookies:{ request.new_jwt}")
         if hasattr(request, 'new_jwt') and request.new_jwt:
             response.set_cookie(
                 settings.JWT_AUTH_COOKIE,

@@ -1,12 +1,11 @@
-from django.core.management.base import BaseCommand
-from django.db import connection
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from apps.patients.models import Patient, PatientDemographics, PatientAddress
+from django.core.management.base import BaseCommand
+from django_tenants.utils import tenant_context
+
+from apps.patients.models import Patient, PatientAddress, PatientDemographics
 from apps.staff.models import StaffRole
 from tenants.models import Client
-from django.db import connection
-from django_tenants.utils import tenant_context
 
 
 class Command(BaseCommand):

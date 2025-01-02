@@ -1,9 +1,10 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from django_tenants.utils import get_tenant_domain_model
-from django_tenants.utils import schema_context
+from django_tenants.utils import get_tenant_domain_model, schema_context
+
 from hospital.models import HospitalProfile
-from .models import StaffMember, Department, StaffRole
+
+from .models import Department, StaffMember, StaffRole
 
 
 @admin.register(StaffMember)
@@ -14,7 +15,7 @@ class StaffMemberAdmin(UserAdmin):
     fieldsets = (
         (None, {"fields": ("email", "password")}),
         ("Personal info", {"fields": ("first_name", "last_name")}),
-        ("Staff info", {"fields": ("role", "department")}),
+        ("Staff info", {"fields": ("role", "department", "hospital")}),
         (
             "Permissions",
             {
@@ -41,12 +42,38 @@ class StaffMemberAdmin(UserAdmin):
                     "password2",
                     "role",
                     "department",
+                    "hospital",
                 ),
             },
         ),
     )
     search_fields = ("email", "first_name", "last_name")
     ordering = ("email",)
+
+    def get_form(self, request, obj=None, **kwargs):
+        """
+        Customize the form to associate the department with the current schema's hospital
+        and make the 'hospital' field readonly or hidden.
+        """
+        form = super().get_form(request, obj, **kwargs)
+        tenant_domain = get_tenant_domain_model().objects.get(domain=request.get_host().split(":")[0])
+
+        with schema_context(tenant_domain.tenant.schema_name):
+            hospital = HospitalProfile.objects.get(tenant_id=tenant_domain.tenant.id)
+
+        # If the object is being created, set the hospital field to the current schema's hospital.
+        if not obj:
+            form.base_fields["hospital"].initial = hospital
+            form.base_fields["hospital"].widget.attrs["readonly"] = True
+            form.base_fields["hospital"].widget.attrs["disabled"] = True
+        else:
+            # If updating an existing department, set the hospital field to the current schema's hospital
+            form.base_fields["hospital"].initial = hospital
+            form.base_fields["hospital"].widget.attrs["readonly"] = True
+            form.base_fields["hospital"].widget.attrs["disabled"] = True
+
+        return form
+
 
     def get_tenant(self, request):
         domain = get_tenant_domain_model().objects.get(domain=request.get_host().split(":")[0])
