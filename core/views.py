@@ -15,6 +15,33 @@ from rest_framework_simplejwt.views import (
 
 logger = logging.getLogger(__name__)
 
+class CookieTokenMixin:
+    def set_auth_cookies(self, response, access_token=None, refresh_token=None):
+        if access_token:
+            response.set_cookie(
+                settings.JWT_AUTH_COOKIE,
+                access_token,
+                max_age=settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(),
+                secure=True,  # Force secure for production safety
+                httponly=True,
+                samesite="None",  # Allow cross-site requests
+                domain=settings.BASE_DOMAIN,
+                path="/",
+            )
+
+        if refresh_token:
+            response.set_cookie(
+                settings.JWT_AUTH_REFRESH_COOKIE,
+                refresh_token,
+                max_age=settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds(),
+                secure=True,
+                httponly=True,
+                samesite="None",
+                domain=settings.BASE_DOMAIN,
+                path="/",
+            )
+
+        return response
 
 class CookieTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
@@ -38,11 +65,10 @@ class CookieTokenObtainPairView(TokenObtainPairView):
         try:
             logger.debug(f"Setting cookies with data: {response.data}")  # noqa: G004
             self._validate_token_data(response.data)
-
             # Set access token cookie
             response.set_cookie(
-                key=settings.JWT_AUTH_COOKIE,
-                value=response.data["access"],
+                settings.JWT_AUTH_COOKIE,
+                response.data["access"],
                 max_age=settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(),
                 secure=settings.JWT_AUTH_SECURE,
                 httponly=settings.JWT_AUTH_HTTPONLY,
@@ -52,8 +78,8 @@ class CookieTokenObtainPairView(TokenObtainPairView):
 
             # Set refresh token cookie
             response.set_cookie(
-                key=settings.JWT_AUTH_REFRESH_COOKIE,
-                value=response.data["refresh"],
+                settings.JWT_AUTH_REFRESH_COOKIE,
+                response.data["refresh"],
                 max_age=settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds(),
                 secure=settings.JWT_AUTH_SECURE,
                 httponly=settings.JWT_AUTH_HTTPONLY,
@@ -91,7 +117,7 @@ class CookieTokenRefreshView(TokenRefreshView):
             )
 
         try:
-            # Rate limiting check
+            #Rate limiting check
             if not self._check_rate_limit(refresh_token):
                 return Response(
                     {"detail": "Too many refresh attempts"},
@@ -99,8 +125,7 @@ class CookieTokenRefreshView(TokenRefreshView):
                 )
 
             # Validate and get new tokens
-            request.data._mutable = True  # noqa: SLF001
-            request.data["refresh"] = refresh_token
+            request._full_data = {"refresh": refresh_token}
             response = super().post(request, *args, **kwargs)
 
             if response.status_code == status.HTTP_200_OK:
@@ -138,10 +163,11 @@ class CookieTokenRefreshView(TokenRefreshView):
             response.set_cookie(
                 settings.JWT_AUTH_COOKIE,
                 response.data["access"],
-                max_age=settings.JWT_ACCESS_TOKEN_LIFETIME.total_seconds(),
-                httponly=True,
-                secure=True,
-                samesite="Strict"
+                max_age=settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(),
+                httponly=settings.JWT_AUTH_HTTPONLY,
+                secure=settings.JWT_AUTH_SECURE,
+                samesite=settings.JWT_AUTH_SAMESITE,
+                path="/",
             )
             response.data.pop("access")
 
@@ -149,10 +175,11 @@ class CookieTokenRefreshView(TokenRefreshView):
             response.set_cookie(
                 settings.JWT_AUTH_REFRESH_COOKIE,
                 response.data["refresh"],
-                max_age=settings.JWT_REFRESH_TOKEN_LIFETIME.total_seconds(),
-                httponly=True,
-                secure=True,
-                samesite="Strict"
+                max_age=settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds(),
+                httponly=settings.JWT_AUTH_HTTPONLY,
+                secure=settings.JWT_AUTH_SECURE,
+                samesite=settings.JWT_AUTH_SAMESITE,
+                path="/",
             )
             response.data.pop("refresh")
 

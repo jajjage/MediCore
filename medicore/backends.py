@@ -11,12 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class MultiSchemaModelBackend(ModelBackend):
-    """ " Check to authenticate users in both public and tenant schemas"""
+    """Check to authenticate users in both public and tenant schemas."""
 
     def authenticate(self, request, username=None, password=None, **kwargs):
-        logger.info(f"Authentication attempt - Schema: {connection.schema_name}")
+        logger.info("Authentication attempt - Schema: %s", connection.schema_name)
         logger.info(
-            f"Request data: {request.data if hasattr(request, 'data') else 'No data'}"
+            "Request data: %s", request.data if hasattr(request, "data") else "No data"
         )
 
         # Handle empty username cases
@@ -27,17 +27,17 @@ class MultiSchemaModelBackend(ModelBackend):
             logger.error("Missing credentials - username or password is None")
             return None
 
-        logger.info(f"Attempting authentication for email: {username}")
+        logger.info("Attempting authentication for email: %s", username)
 
         # Authenticate user IF schema is public
         if connection.schema_name == get_public_schema_name():
-            UserModel = get_user_model()
+            usermodel = get_user_model()
             try:
-                user = UserModel.objects.get(email=username)
+                user = usermodel.objects.get(email=username)
                 if user.check_password(password):
                     return user
-            except UserModel.DoesNotExist:
-                logger.warning(f"User {username} not found in public schema")
+            except usermodel.DoesNotExist:
+                logger.warning("User %s, {username} not found in public schema")
                 return None
         else:
             # Authenticate user IF schema is tenant
@@ -46,18 +46,18 @@ class MultiSchemaModelBackend(ModelBackend):
                 if user.check_password(password):
                     return user
             except StaffMember.DoesNotExist:
-                logger.warning(f"User {username} not found in tenant schema")
+                logger.warning("User %s, {username} not found in tenant schema")
                 return None
         return None
 
     # This would be use to get the user from the token later
     def get_user(self, user_id):
-        UserModel = (
+        usermodel = (
             StaffMember
             if connection.schema_name != get_public_schema_name()
             else get_user_model()
         )
         try:
-            return UserModel.objects.get(pk=user_id)
-        except UserModel.DoesNotExist:
+            return usermodel.objects.get(pk=user_id)
+        except usermodel.DoesNotExist:
             return None

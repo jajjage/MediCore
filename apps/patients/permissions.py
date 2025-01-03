@@ -1,6 +1,5 @@
 from rest_framework.permissions import BasePermission
 
-# from django.contrib.auth.models import Permission
 from apps.staff.helper import convert_queryset_to_role_permissions
 from apps.staff.models import StaffRole
 
@@ -48,7 +47,6 @@ class RolePermission(BasePermission):
 
     def __init__(self):
         super().__init__()
-        # print("RolePermission initialized")
 
     def has_permission(self, request, view):
         # Extract and normalize the user role
@@ -58,12 +56,9 @@ class RolePermission(BasePermission):
 
         # Extract role as string
         user_role = str(raw_role).strip().upper().replace(" ", "_")
-        # print(f"Extracted and normalized user role: {user_role}")
 
         # Check if role is in ROLE_PERMISSIONS
         if user_role not in ROLE_PERMISSIONS:
-            # print(f"Role '{user_role}' not in defined permissions.")
-            # print(f"Available roles: {ROLE_PERMISSIONS.keys()}")
             return False
 
         # Determine resource and action
@@ -85,19 +80,22 @@ class RolePermission(BasePermission):
         if not permission:
             return False
 
+        perms = StaffRole.objects.get(code=user_role).permissions.all()
         # Check if the user's role has the required permission
+        if user_role and perms:
+            permissions_dict = convert_queryset_to_role_permissions(perms)
+            model_permissions = permissions_dict.get(normalized_resource, [])
+            return permission in model_permissions
         allowed_permissions = ROLE_PERMISSIONS.get(user_role, {})
         inner_lists = allowed_permissions.get(normalized_resource)
-        if permission in inner_lists:
-            return True
-        return False
+        return permission in inner_lists
 
 
 class PermissionCheckedSerializerMixin:
     """
     A mixin to handle permission checking in serializers with support for both
     QuerySet and dictionary-based permissions.
-    """
+    """  # noqa: D205
 
     def check_permission(self, permission_type: str, model_name: str) -> bool:
         request = self.context.get("request")

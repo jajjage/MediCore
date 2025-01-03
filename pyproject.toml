@@ -118,6 +118,8 @@ ignore = [
     "RUF012",   # "Use of `assert` detected"
     "TRY401",   # "Avoid using `assert` in `try` block"
     "ARG002",   # "Avoid using mutable default arguments"
+    "TRY301",   # "Avoid using `assert` in `try` block"
+    "SLF001",   # "Avoid using `self` in method signature"
 ]
 
 [tool.ruff.lint.per-file-ignores]

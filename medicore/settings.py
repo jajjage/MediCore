@@ -59,8 +59,8 @@ SHARED_APPS = [
 INSTALLED_APPS = list(set(SHARED_APPS) | set(TENANT_APPS))
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
     "django_tenants.middleware.main.TenantMainMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -169,6 +169,8 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": JWT_REFRESH_TOKEN_LIFETIME,
     "AUTH_COOKIE": JWT_AUTH_COOKIE,
     "AUTH_COOKIE_REFRESH": JWT_AUTH_REFRESH_COOKIE,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": False,
 }
 # Tenant vs Public Schema User Model Configuration
 PUBLIC_SCHEMA_USER_MODEL = "core.MyUser"
@@ -262,6 +264,8 @@ CORS_ALLOW_METHODS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 
 # Ensure cookies are allowed
 CORS_ALLOW_HEADERS = [

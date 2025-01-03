@@ -12,7 +12,7 @@ class PatientAddressSerializer(
     PermissionCheckedSerializerMixin, serializers.ModelSerializer
 ):
     """
-    Serializer for patient addresses with validation
+    Serializer for patient addresses with validation.
     """
 
     class Meta:
@@ -53,7 +53,7 @@ class PatientAddressSerializer(
 
 class PatientDemographicsSerializer(serializers.ModelSerializer):
     """
-    Serializer for patient demographics with additional computed fields
+    Serializer for patient demographics with additional computed fields.
     """
 
     bmi = serializers.SerializerMethodField()
@@ -103,7 +103,7 @@ class PatientListCreateSerializer(
     PermissionCheckedSerializerMixin, serializers.ModelSerializer
 ):
     """
-    Simplified serializer for list views with essential information
+    Simplified serializer for list views with essential information.
     """
 
     demographics = PatientDemographicsSerializer(required=False)
@@ -144,7 +144,7 @@ class PatientListCreateSerializer(
             raise serializers.ValidationError(
                 {"error": "You don't have permission to update patient information"}
             )
-        elif not is_update and not self.check_permission("add", "patient"):
+        if not is_update and not self.check_permission("add", "patient"):
             raise serializers.ValidationError(
                 {"error": "You don't have permission to create patients"}
             )
@@ -155,7 +155,7 @@ class PatientListCreateSerializer(
                 raise serializers.ValidationError(
                     {"demographics": "You don't have permission to update demographics"}
                 )
-            elif not is_update and not self.check_permission(
+            if not is_update and not self.check_permission(
                 "view", "patientdemographics"
             ):
                 raise serializers.ValidationError(
@@ -168,7 +168,7 @@ class PatientListCreateSerializer(
                 raise serializers.ValidationError(
                     {"addresses": "You don't have permission to update addresses"}
                 )
-            elif not is_update and not self.check_permission("add", "patientaddress"):
+            if not is_update and not self.check_permission("add", "patientaddress"):
                 raise serializers.ValidationError(
                     {
                         "addresses": "You don't have permission to add addresses from validation"
@@ -183,7 +183,7 @@ class PatientListCreateSerializer(
         return f"{obj.first_name} {obj.last_name}".strip()
 
     def get_age(self, obj):
-        today = date.today()
+        today = date.today()  # noqa: DTZ011
         return (
             today.year
             - obj.date_of_birth.year
@@ -256,7 +256,7 @@ class PatientListCreateSerializer(
 
     def to_representation(self, instance):
         """
-        Optimize query for list view by using select_related and prefetch_related
+        Optimize query for list view by using select_related and prefetch_related.
         """
         representation = super().to_representation(instance)
 

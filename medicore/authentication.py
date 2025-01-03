@@ -3,8 +3,8 @@ import logging
 from django.conf import settings
 from django.db import connection
 from django_tenants.utils import get_public_schema_name
-from rest_framework_simplejwt.authentication import JWTAuthentication  # type: ignore
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError  # type: ignore
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +22,11 @@ class RobustCookieJWTAuthentication(JWTAuthentication):
             try:
                 validated_token = self.get_validated_token(raw_token)
             except TokenError as e:
-                logger.error(f"Token validation failed: {str(e)}")
-                raise InvalidToken(str(e))
+                logger.exception("Token validation failed: %s", e)
+                raise InvalidToken(str(e)) from e
             except Exception as e:
-                logger.error(f"Unexpected error during token validation: {str(e)}")
-                raise TokenError(str(e))
+                logger.exception("Unexpected error during token validation: %s", e)
+                raise TokenError(str(e)) from e
 
             # Get user based on schema
             try:
@@ -41,16 +41,15 @@ class RobustCookieJWTAuthentication(JWTAuthentication):
                 if schema_name == get_public_schema_name():
                     if not user._meta.model.__name__ == "MyUser":
                         raise TokenError("Invalid user type for public schema")
-                else:
-                    if not user._meta.model.__name__ == "StaffMember":
-                        raise TokenError("Invalid user type for tenant schema")
+                elif user._meta.model.__name__ != "StaffMember":
+                    raise TokenError("Invalid user type for tenant schema")
 
-                return user, validated_token
+                return user, validated_token  # noqa: TRY300
 
             except Exception as e:
-                logger.error(f"Error getting user from token: {str(e)}")
-                raise TokenError(str(e))
+                logger.exception("Error getting user from token: %s", e)
+                raise TokenError(str(e)) from e
 
-        except Exception as e:
-            logger.error(f"Authentication failed: {str(e)}")
+        except (TokenError, InvalidToken) as e:
+            logger.exception("Authentication failed: %s", e)
             return None
