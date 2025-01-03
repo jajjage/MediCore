@@ -21,7 +21,9 @@ class Migration(migrations.Migration):
                         db_index=True,
                         max_length=63,
                         unique=True,
-                        validators=[django_tenants.postgresql_backend.base._check_schema_name],
+                        validators=[
+                            django_tenants.postgresql_backend.base._check_schema_name
+                        ],
                     ),
                 ),
                 (
@@ -73,7 +75,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "tenant",
-                    models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="tenants.client"),
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, to="tenants.client"
+                    ),
                 ),
             ],
             options={

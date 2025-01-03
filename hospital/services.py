@@ -30,7 +30,10 @@ class TenantCreationService:
         )
 
         # Create domain
-        domain_name = f"{validated_data['hospital_name'].lower().replace(' ', '-')}" f".{settings.BASE_DOMAIN}"
+        domain_name = (
+            f"{validated_data['hospital_name'].lower().replace(' ', '-')}"
+            f".{settings.BASE_DOMAIN}"
+        )
         Domain.objects.create(domain=domain_name, tenant=tenant, is_primary=True)
 
         # Create admin user

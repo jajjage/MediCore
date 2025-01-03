@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("hospital", "0003_alter_hospitalprofile_admin_user"),
         ("staff", "0001_initial"),

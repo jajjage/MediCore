@@ -72,11 +72,15 @@ class Migration(migrations.Migration):
                 ("blood_type", models.CharField(blank=True, max_length=5, null=True)),
                 (
                     "height_cm",
-                    models.DecimalField(blank=True, decimal_places=2, max_digits=5, null=True),
+                    models.DecimalField(
+                        blank=True, decimal_places=2, max_digits=5, null=True
+                    ),
                 ),
                 (
                     "weight_kg",
-                    models.DecimalField(blank=True, decimal_places=2, max_digits=5, null=True),
+                    models.DecimalField(
+                        blank=True, decimal_places=2, max_digits=5, null=True
+                    ),
                 ),
                 ("allergies", models.JSONField(blank=True, default=list)),
                 ("chronic_conditions", models.JSONField(blank=True, default=list)),
@@ -139,7 +143,11 @@ class Migration(migrations.Migration):
                     ("view_patient", "Can view patient"),
                     ("view_patient_address", "Can view patient address"),
                 ],
-                "indexes": [models.Index(fields=["postal_code"], name="patient_add_postal__1b2093_idx")],
+                "indexes": [
+                    models.Index(
+                        fields=["postal_code"], name="patient_add_postal__1b2093_idx"
+                    )
+                ],
             },
         ),
     ]

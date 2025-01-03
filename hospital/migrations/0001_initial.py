@@ -56,7 +56,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "tenant",
-                    models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to="tenants.client"),
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE, to="tenants.client"
+                    ),
                 ),
             ],
             options={

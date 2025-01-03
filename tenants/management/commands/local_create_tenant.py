@@ -32,8 +32,12 @@ class Command(BaseCommand):
         )
 
         # Hospital Profile arguments
-        parser.add_argument("--admin-email", required=True, type=str, help="Admin user email")
-        parser.add_argument("--admin-password", required=True, type=str, help="Admin user password")
+        parser.add_argument(
+            "--admin-email", required=True, type=str, help="Admin user email"
+        )
+        parser.add_argument(
+            "--admin-password", required=True, type=str, help="Admin user password"
+        )
         parser.add_argument(
             "--subscription-plan",
             type=str,
@@ -58,7 +62,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f"Created tenant: {tenant.name}"))
 
             # Add domain for tenant
-            domain = Domain.objects.create(domain=options["domain_domain"], tenant=tenant, is_primary=True)
+            domain = Domain.objects.create(
+                domain=options["domain_domain"], tenant=tenant, is_primary=True
+            )
             self.stdout.write(self.style.SUCCESS(f"Created domain: {domain.domain}"))
 
             # Create admin user and hospital profile
@@ -69,7 +75,9 @@ class Command(BaseCommand):
                     first_name="Hospital",
                     last_name="Admin",
                 )
-                self.stdout.write(self.style.SUCCESS(f"Created admin user: {admin_user.email}"))
+                self.stdout.write(
+                    self.style.SUCCESS(f"Created admin user: {admin_user.email}")
+                )
 
                 hospital_profile = HospitalProfile.objects.create(
                     tenant=tenant,
@@ -83,7 +91,11 @@ class Command(BaseCommand):
                     specialty="General",
                     bed_capacity=100,
                 )
-                self.stdout.write(self.style.SUCCESS(f"Created hospital profile for: {hospital_profile.hospital_name}"))
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Created hospital profile for: {hospital_profile.hospital_name}"
+                    )
+                )
 
             self.stdout.write(
                 self.style.SUCCESS(

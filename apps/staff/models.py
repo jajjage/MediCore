@@ -26,7 +26,9 @@ class StaffManager(BaseUserManager):
 class Department(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
-    hospital = models.ForeignKey("hospital.HospitalProfile", on_delete=models.CASCADE, null=True, blank=True)
+    hospital = models.ForeignKey(
+        "hospital.HospitalProfile", on_delete=models.CASCADE, null=True, blank=True
+    )
 
     def __str__(self):
         return self.name
@@ -39,7 +41,9 @@ class StaffRole(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=50, unique=True)
-    permissions = models.ManyToManyField("auth.Permission", blank=True, related_name="staff_roles")
+    permissions = models.ManyToManyField(
+        "auth.Permission", blank=True, related_name="staff_roles"
+    )
 
     class Meta:
         db_table = "staff_staffrole"
@@ -51,7 +55,9 @@ class StaffRole(models.Model):
 class StaffMember(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
-    hospital = models.ForeignKey("hospital.HospitalProfile", on_delete=models.CASCADE, null=True, blank=True)   
+    hospital = models.ForeignKey(
+        "hospital.HospitalProfile", on_delete=models.CASCADE, null=True, blank=True
+    )
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     role = models.ForeignKey(StaffRole, on_delete=models.SET_NULL, null=True)

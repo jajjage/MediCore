@@ -24,7 +24,9 @@ class CreateTenantAPIView(APIView):
             serializer.is_valid(raise_exception=True)
 
             # Create tenant and related objects
-            hospital_profile = TenantCreationService.create_tenant(serializer.validated_data)
+            hospital_profile = TenantCreationService.create_tenant(
+                serializer.validated_data
+            )
 
             # Prepare response
             response_serializer = HospitalProfileSerializer(hospital_profile)

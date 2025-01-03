@@ -37,7 +37,7 @@ class RobustCookieJWTAuthentication(JWTAuthentication):
 
                 # Validate user for current schema
                 schema_name = connection.schema_name
-                
+
                 if schema_name == get_public_schema_name():
                     if not user._meta.model.__name__ == "MyUser":
                         raise TokenError("Invalid user type for public schema")

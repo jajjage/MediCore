@@ -19,8 +19,7 @@ ENCRYPTION_KEY = env("ENCRYPTION_KEY", default="")
 DEBUG = env("DEBUG", default=True)
 
 ALLOWED_HOSTS = env("ALLOWED_HOSTS", default="*").split(",")
-BASE_URL= env("BASE_URL", default="http://.medicore.local:8000/api/v1/")
-print(BASE_URL)
+BASE_URL = env("BASE_URL", default="http://.medicore.local:8000/api/v1/")
 # Application definition
 # List of default Django apps and third-party apps that are common to both shared and tenant apps
 DEFAULT_APPS = [
@@ -69,7 +68,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "medicore.middleware.AdminAccessMiddleware",
-    "medicore.middleware.JWTRefreshMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "medicore.middleware.DynamicAuthModelMiddleware",
 ]
@@ -116,13 +114,13 @@ DATABASE_ROUTERS = ("django_tenants.routers.TenantSyncRouter",)
 # settings.py
 
 CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',  # Redis URL
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",  # Redis URL
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
-        'KEY_PREFIX': 'medicore'  # Optional, helps avoid key collisions
+        "KEY_PREFIX": "medicore",  # Optional, helps avoid key collisions
     }
 }
 
@@ -177,18 +175,18 @@ PUBLIC_SCHEMA_USER_MODEL = "core.MyUser"
 TENANT_SCHEMA_USER_MODEL = "staff.StaffMember"
 
 # Add API settings
-API_VERSION = 'v1'
-API_BASE_PATH = f'/api/{API_VERSION}'
-SITE_DOMAIN = 'medicore.local'
-SITE_SCHEME = 'http' if DEBUG else 'https'
+API_VERSION = "v1"
+API_BASE_PATH = f"/api/{API_VERSION}"
+SITE_DOMAIN = "medicore.local"
+SITE_SCHEME = "http" if DEBUG else "https"
 API_TIMEOUT = 5
 API_MAX_RETRIES = 3
 LOCAL_PORT = 8000 if DEBUG else 80
 # JWT settings
 JWT_AUTH_ENDPOINTS = {
-    'refresh': f'{API_BASE_PATH}/auth/token/refresh/',
-    'verify': f'{API_BASE_PATH}/auth/token/verify/',
-    'obtain': f'{API_BASE_PATH}/auth/token/',
+    "refresh": f"{API_BASE_PATH}/auth/token/refresh/",
+    "verify": f"{API_BASE_PATH}/auth/token/verify/",
+    "obtain": f"{API_BASE_PATH}/auth/token/",
 }
 
 DJOSER = {
@@ -253,9 +251,14 @@ LOGGING = {
     },
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Add your frontend URL here
-    "http://city-hospital.medicore.local",
+CORS_ALLOWED_ORIGINS = str(env("CORS_ALLOWED_ORIGINS", default="*")).split(",")
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
 ]
 
 CORS_ALLOW_CREDENTIALS = True

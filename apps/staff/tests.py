@@ -40,7 +40,9 @@ class StaffRolesSetupTest(TestCase):
 
     def test_head_doctor_permissions(self):
         head_doctor_role = StaffRole.objects.get(code="HEAD_DOCTOR")
-        permissions = set(head_doctor_role.permissions.values_list("codename", flat=True))
+        permissions = set(
+            head_doctor_role.permissions.values_list("codename", flat=True)
+        )
 
         # Head doctor should have all doctor permissions plus delete
         self.assertTrue("delete_patient" in permissions)

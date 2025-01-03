@@ -69,9 +69,9 @@ class RolePermission(BasePermission):
         # Determine resource and action
         resource = view.basename  # Normalize resource name
         resource_ = resource.replace("-", " ")  # Replace hyphens with spaces
-        normalized_resource = "".join(word for word in resource_.split()) 
+        normalized_resource = "".join(word for word in resource_.split())
         action = view.action
-        
+
         # Map DRF actions to permissions
         action_to_permission = {
             "list": "view",
@@ -85,7 +85,6 @@ class RolePermission(BasePermission):
         if not permission:
             return False
 
-       
         # Check if the user's role has the required permission
         allowed_permissions = ROLE_PERMISSIONS.get(user_role, {})
         inner_lists = allowed_permissions.get(normalized_resource)
@@ -93,22 +92,23 @@ class RolePermission(BasePermission):
             return True
         return False
 
+
 class PermissionCheckedSerializerMixin:
     """
     A mixin to handle permission checking in serializers with support for both
     QuerySet and dictionary-based permissions.
     """
+
     def check_permission(self, permission_type: str, model_name: str) -> bool:
-        request = self.context.get('request')
+        request = self.context.get("request")
         if not request or not request.user:
             return False
-        
+
         user_role = request.user.role
         role = str(user_role).strip().upper().replace(" ", "_")
-        
-        
+
         # If using the database permissions
-        if hasattr(request.user, 'user_permissions'):
+        if hasattr(request.user, "user_permissions"):
             perms = StaffRole.objects.get(code=role).permissions.all()
             permissions_dict = convert_queryset_to_role_permissions(perms)
             model_permissions = permissions_dict.get(model_name, [])
@@ -116,5 +116,5 @@ class PermissionCheckedSerializerMixin:
             # Fall back to ROLE_PERMISSIONS dictionary
             user_permissions = ROLE_PERMISSIONS.get(role, {})
             model_permissions = user_permissions.get(model_name, [])
-            
+
         return permission_type in model_permissions

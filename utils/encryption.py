@@ -33,7 +33,9 @@ def encrypt_sensitive_fields(fields):
             for field in fields:
                 value = getattr(instance, field, None)
                 if value:
-                    setattr(instance, f"{field}_encrypted", field_encryption.encrypt(value))
+                    setattr(
+                        instance, f"{field}_encrypted", field_encryption.encrypt(value)
+                    )
                     setattr(instance, field, None)  # Clear the plain text value
             return func(instance, *args, **kwargs)
 

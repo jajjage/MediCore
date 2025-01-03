@@ -17,7 +17,9 @@ class MyUserManager(BaseUserManager):
         if not hospital:
             raise ValueError("Tenant admin must be associated with a hospital")
 
-        user = self.model(email=self.normalize_email(email), hospital=hospital, is_tenant_admin=True)
+        user = self.model(
+            email=self.normalize_email(email), hospital=hospital, is_tenant_admin=True
+        )
         user.set_password(password)
         user.save(using=self._db)
         return user
@@ -26,7 +28,9 @@ class MyUserManager(BaseUserManager):
         """
         Creates and saves a superuser
         """
-        user = self.model(email=self.normalize_email(email), is_superuser=True, is_tenant_admin=True)
+        user = self.model(
+            email=self.normalize_email(email), is_superuser=True, is_tenant_admin=True
+        )
         user.set_password(password)
         user.save(using=self._db)
         return user
@@ -35,7 +39,9 @@ class MyUserManager(BaseUserManager):
 class MyUser(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
-    hospital = models.ForeignKey("tenants.Client", on_delete=models.CASCADE, null=True, blank=True)
+    hospital = models.ForeignKey(
+        "tenants.Client", on_delete=models.CASCADE, null=True, blank=True
+    )
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=True)
     is_tenant_admin = models.BooleanField(default=False)

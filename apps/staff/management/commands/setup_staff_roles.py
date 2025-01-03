@@ -83,17 +83,25 @@ class Command(BaseCommand):
                 with tenant_context(tenant):
                     self.setup_roles(roles_data)
 
-            self.stdout.write(self.style.SUCCESS("Staff roles setup completed successfully for all tenants"))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "Staff roles setup completed successfully for all tenants"
+                )
+            )
 
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Error during staff roles setup: {str(e)}"))
+            self.stdout.write(
+                self.style.ERROR(f"Error during staff roles setup: {str(e)}")
+            )
             raise
 
     def setup_roles(self, roles_data):
         # Get content types for our models
         model_content_types = {
             "patient": ContentType.objects.get_for_model(Patient),
-            "patientdemographics": ContentType.objects.get_for_model(PatientDemographics),
+            "patientdemographics": ContentType.objects.get_for_model(
+                PatientDemographics
+            ),
             "patientaddress": ContentType.objects.get_for_model(PatientAddress),
         }
 
@@ -101,7 +109,9 @@ class Command(BaseCommand):
             self.stdout.write(f'Processing role: {role_info["name"]}')
 
             # Create or update each role
-            role, created = StaffRole.objects.get_or_create(code=role_code, defaults={"name": role_info["name"]})
+            role, created = StaffRole.objects.get_or_create(
+                code=role_code, defaults={"name": role_info["name"]}
+            )
 
             if not created:
                 role.name = role_info["name"]
@@ -119,8 +129,14 @@ class Command(BaseCommand):
                 for action in actions:
                     codename = f"{action}_{model_name}"
                     try:
-                        permission = Permission.objects.get(codename=codename, content_type=content_type)
+                        permission = Permission.objects.get(
+                            codename=codename, content_type=content_type
+                        )
                         role.permissions.add(permission)
-                        self.stdout.write(f"Added permission: {codename} to {role.name}")
+                        self.stdout.write(
+                            f"Added permission: {codename} to {role.name}"
+                        )
                     except Permission.DoesNotExist:
-                        self.stdout.write(self.style.WARNING(f"Permission {codename} does not exist"))
+                        self.stdout.write(
+                            self.style.WARNING(f"Permission {codename} does not exist")
+                        )

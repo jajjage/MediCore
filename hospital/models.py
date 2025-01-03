@@ -13,7 +13,9 @@ User = get_user_model()
 class HospitalProfile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.OneToOneField(Client, on_delete=models.CASCADE)
-    admin_user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    admin_user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE
+    )
 
     SUBSCRIPTION_CHOICES = [
         ("trial", "Trial"),
@@ -44,10 +46,20 @@ class HospitalProfile(models.Model):
         # Add validation
         if self.tenant_id and self.pk is None:  # New hospital
             if Client.objects.filter(schema_name=self.tenant.schema_name).exists():
-                raise ValidationError({"tenant": "A tenant with this schema name already exists."})
+                raise ValidationError(
+                    {"tenant": "A tenant with this schema name already exists."}
+                )
 
         if MyUser.objects.filter(email=self.contact_email).exists():
-            raise ValidationError({"contact_email": "A user with this email already exists."})
+            raise ValidationError(
+                {"contact_email": "A user with this email already exists."}
+            )
 
-        if HospitalProfile.objects.filter(license_number=self.license_number).exclude(pk=self.pk).exists():
-            raise ValidationError({"license_number": "This license number is already registered."})
+        if (
+            HospitalProfile.objects.filter(license_number=self.license_number)
+            .exclude(pk=self.pk)
+            .exists()
+        ):
+            raise ValidationError(
+                {"license_number": "This license number is already registered."}
+            )

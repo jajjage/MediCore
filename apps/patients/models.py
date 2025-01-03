@@ -49,10 +49,16 @@ class Patient(models.Model):
 
 class PatientDemographics(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    patient = models.OneToOneField(Patient, on_delete=models.CASCADE, related_name="demographics")
+    patient = models.OneToOneField(
+        Patient, on_delete=models.CASCADE, related_name="demographics"
+    )
     blood_type = models.CharField(max_length=5, blank=True, null=True)
-    height_cm = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
-    weight_kg = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
+    height_cm = models.DecimalField(
+        max_digits=5, decimal_places=2, blank=True, null=True
+    )
+    weight_kg = models.DecimalField(
+        max_digits=5, decimal_places=2, blank=True, null=True
+    )
     allergies = models.JSONField(default=list, blank=True)
     gender = models.CharField(max_length=50, blank=True, null=True)
     race = models.CharField(max_length=50, blank=True, null=True)
@@ -77,7 +83,9 @@ class PatientDemographics(models.Model):
 
 class PatientAddress(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="addresses")
+    patient = models.ForeignKey(
+        Patient, on_delete=models.CASCADE, related_name="addresses"
+    )
     address_type = models.CharField(max_length=50)  # home, work, etc.
     street_address1 = models.CharField(max_length=255)
     street_address2 = models.CharField(max_length=255, blank=True, null=True)

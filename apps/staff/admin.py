@@ -56,7 +56,9 @@ class StaffMemberAdmin(UserAdmin):
         and make the 'hospital' field readonly or hidden.
         """
         form = super().get_form(request, obj, **kwargs)
-        tenant_domain = get_tenant_domain_model().objects.get(domain=request.get_host().split(":")[0])
+        tenant_domain = get_tenant_domain_model().objects.get(
+            domain=request.get_host().split(":")[0]
+        )
 
         with schema_context(tenant_domain.tenant.schema_name):
             hospital = HospitalProfile.objects.get(tenant_id=tenant_domain.tenant.id)
@@ -74,9 +76,10 @@ class StaffMemberAdmin(UserAdmin):
 
         return form
 
-
     def get_tenant(self, request):
-        domain = get_tenant_domain_model().objects.get(domain=request.get_host().split(":")[0])
+        domain = get_tenant_domain_model().objects.get(
+            domain=request.get_host().split(":")[0]
+        )
         with schema_context("public"):
             hospital = HospitalProfile.objects.get(tenant_id=domain.tenant.id)
             return hospital
@@ -112,7 +115,9 @@ class DepartmentAdmin(admin.ModelAdmin):
         and make the 'hospital' field readonly or hidden.
         """
         form = super().get_form(request, obj, **kwargs)
-        tenant_domain = get_tenant_domain_model().objects.get(domain=request.get_host().split(":")[0])
+        tenant_domain = get_tenant_domain_model().objects.get(
+            domain=request.get_host().split(":")[0]
+        )
 
         with schema_context(tenant_domain.tenant.schema_name):
             hospital = HospitalProfile.objects.get(tenant_id=tenant_domain.tenant.id)
@@ -135,9 +140,13 @@ class DepartmentAdmin(admin.ModelAdmin):
         Automatically set the hospital field to the current schema's hospital during save.
         """
         if not change:  # If creating a new instance
-            tenant_domain = get_tenant_domain_model().objects.get(domain=request.get_host().split(":")[0])
+            tenant_domain = get_tenant_domain_model().objects.get(
+                domain=request.get_host().split(":")[0]
+            )
             with schema_context(tenant_domain.tenant.schema_name):
-                hospital = HospitalProfile.objects.get(tenant_id=tenant_domain.tenant.id)
+                hospital = HospitalProfile.objects.get(
+                    tenant_id=tenant_domain.tenant.id
+                )
             obj.hospital = hospital
 
         # Ensure hospital is set correctly before saving
@@ -150,7 +159,9 @@ class DepartmentAdmin(admin.ModelAdmin):
         Ensure that the queryset only returns departments for the current hospital.
         """
         qs = super().get_queryset(request)
-        tenant_domain = get_tenant_domain_model().objects.get(domain=request.get_host().split(":")[0])
+        tenant_domain = get_tenant_domain_model().objects.get(
+            domain=request.get_host().split(":")[0]
+        )
 
         with schema_context(tenant_domain.tenant.schema_name):
             hospital = HospitalProfile.objects.get(tenant_id=tenant_domain.tenant.id)

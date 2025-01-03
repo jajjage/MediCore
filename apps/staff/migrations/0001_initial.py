@@ -58,7 +58,9 @@ class Migration(migrations.Migration):
                 ("code", models.CharField(max_length=50, unique=True)),
                 (
                     "permissions",
-                    models.ManyToManyField(blank=True, related_name="staff_roles", to="auth.permission"),
+                    models.ManyToManyField(
+                        blank=True, related_name="staff_roles", to="auth.permission"
+                    ),
                 ),
             ],
             options={
@@ -71,7 +73,9 @@ class Migration(migrations.Migration):
                 ("password", models.CharField(max_length=128, verbose_name="password")),
                 (
                     "last_login",
-                    models.DateTimeField(blank=True, null=True, verbose_name="last login"),
+                    models.DateTimeField(
+                        blank=True, null=True, verbose_name="last login"
+                    ),
                 ),
                 (
                     "is_superuser",
@@ -83,7 +87,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "date_joined",
-                    models.DateTimeField(default=django.utils.timezone.now, verbose_name="date joined"),
+                    models.DateTimeField(
+                        default=django.utils.timezone.now, verbose_name="date joined"
+                    ),
                 ),
                 (
                     "id",

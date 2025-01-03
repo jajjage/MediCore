@@ -1,23 +1,37 @@
-ARG VARIANT="3.11"
-FROM mcr.microsoft.com/vscode/devcontainers/python:0-${VARIANT}
+# FROM mcr.microsoft.com/vscode/devcontainers/python:3.11
+FROM python:3.11-slim
 
-ENV PYTHONUNBUFFERED 1
+# Avoid warnings by switching to noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
+ENV POETRY_HOME="/opt/poetry"
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    POETRY_VERSION=1.7.1 \
+    POETRY_HOME="/opt/poetry" \
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    POETRY_NO_INTERACTION=1 \
+    PATH="${POETRY_HOME}/bin:$PATH"
 
-# [Optional] If your requirements rarely change, uncomment this section to add them to the image.
-COPY requirements.txt /tmp/pip-tmp/
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl build-essential libpq-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir wheel \
+    && curl -sSL https://install.python-poetry.org | python3 -
 
-# [Optional] Uncomment this section to install additional OS packages.
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    build-essential \
-    && apt-get clean
 
-# Upgrade pip and install dependencies
-# RUN python3 -m pip install --upgrade pip \
-#     && pip install setuptools wheel \
-#     && pip3 --disable-pip-version-check --no-cache-dir install -r /tmp/pip-tmp/requirements.txt \
-#     && rm -rf /tmp/pip-tmp
+# Add Poetry to PATH
+ENV PATH="${POETRY_HOME}/bin:$PATH"
 
-# [Optional] Uncomment this line to install global node packages.
-# RUN su vscode -c "source /usr/local/share/nvm/nvm.sh && npm install -g <your-package-here>" 2>&1
+# Create a non-root user
+RUN useradd -ms /bin/bash vscode \
+    && mkdir -p /workspace/MediCore \
+    && chown -R vscode:vscode /workspace/MediCore
+
+# Set working directory
+WORKDIR /workspace/MediCore
+
+
+COPY pyproject.toml poetry.lock* ./
+RUN poetry install --no-root --with test,docs
+
+USER vscode

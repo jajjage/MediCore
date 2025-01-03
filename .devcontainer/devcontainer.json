@@ -2,21 +2,33 @@
   "name": "MediCore Development Environment",
   "dockerComposeFile": "../docker-compose.yaml",
   "service": "app",
-  // "containerEnv": {
-  //   "HOSTNAME": "medicore.local"
-  // },
   "workspaceFolder": "/workspace/MediCore",
+
   "customizations": {
     "vscode": {
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
         "python.linting.enabled": true,
-        "python.linting.pylintEnabled": true,
-        "python.formatting.provider": "ruff",
+        "python.linting.mypyEnabled": true,
+        "python.linting.mypyPath": "/usr/local/bin/mypy",
+        "python.formatting.provider": "black",
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
-          "source.organizeImports": "explicit"
-        }
+          "source.organizeImports.ruff": "explicit",
+          "source.fixAll.ruff": "explicit"
+        },
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.python",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+          }
+        },
+        "ruff.lint.args": ["--config=/workspace/MediCore/pyproject.toml"],
+        "black.args": ["--config=/workspace/MediCore/pyproject.toml"],
+        "mypy.configFile": "/workspace/MediCore/pyproject.toml",
+        "mypy.targets": ["/workspace/MediCore"]
       },
       "extensions": [
         "ms-python.python",
@@ -29,11 +41,21 @@
         "charliermarsh.ruff",
         "ms-azuretools.vscode-docker",
         "yzhang.markdown-all-in-one",
-        "GitHub.copilot"
+        "GitHub.copilot",
+        "ms-python.black-formatter",
+        "tamasfe.even-better-toml",
+        "njpwerner.autodocstring",
+        "KevinRose.vsc-python-indent"
       ]
     }
   },
-  "forwardPorts": [8000, 5432, 6379],
-  "postCreateCommand": "pip install --user -r requirements.txt",
+
+  "forwardPorts": [
+    8000, // Django development server
+    5432, // PostgreSQL
+    6379 // Redis
+  ],
+
+  "postCreateCommand": "poetry install --with test,docs",
   "remoteUser": "vscode"
 }

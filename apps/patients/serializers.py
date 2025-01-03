@@ -8,10 +8,13 @@ from apps.patients.permissions import PermissionCheckedSerializerMixin
 from .models import Patient, PatientAddress, PatientDemographics
 
 
-class PatientAddressSerializer(PermissionCheckedSerializerMixin, serializers.ModelSerializer):
+class PatientAddressSerializer(
+    PermissionCheckedSerializerMixin, serializers.ModelSerializer
+):
     """
     Serializer for patient addresses with validation
     """
+
     class Meta:
         model = PatientAddress
         fields = [
@@ -25,36 +28,36 @@ class PatientAddressSerializer(PermissionCheckedSerializerMixin, serializers.Mod
             "country",
             "is_primary",
             "created_at",
-            "updated_at"
+            "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
-        
-        
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
         # Check if user has change permission for demographics
-        if not self.check_permission('add', 'patientaddress'):
+        if not self.check_permission("add", "patientaddress"):
             # Make all fields read-only if no change permission
             for field_name in self.fields:
                 self.fields[field_name].read_only = True
 
-
     def validate(self, data):
         # Ensure at least one address is marked as primary
-        if data.get('is_primary', False):
+        if data.get("is_primary", False):
             # If this address is being marked as primary, update other addresses
-            patient = self.context.get('patient')
+            patient = self.context.get("patient")
             if patient:
                 PatientAddress.objects.filter(patient=patient).update(is_primary=False)
         return data
+
 
 class PatientDemographicsSerializer(serializers.ModelSerializer):
     """
     Serializer for patient demographics with additional computed fields
     """
+
     bmi = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = PatientDemographics
         fields = [
@@ -74,7 +77,7 @@ class PatientDemographicsSerializer(serializers.ModelSerializer):
             "emergency_contact_phone",
             "chronic_conditions",
             "created_at",
-            "updated_at"
+            "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at", "bmi"]
 
@@ -95,16 +98,19 @@ class PatientDemographicsSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Chronic conditions must be a list")
         return value
 
-class PatientListCreateSerializer(PermissionCheckedSerializerMixin, serializers.ModelSerializer):
+
+class PatientListCreateSerializer(
+    PermissionCheckedSerializerMixin, serializers.ModelSerializer
+):
     """
     Simplified serializer for list views with essential information
     """
+
     demographics = PatientDemographicsSerializer(required=False)
     addresses = PatientAddressSerializer(many=True, required=False)
     full_name = serializers.SerializerMethodField()
     age = serializers.SerializerMethodField()
     primary_address = serializers.SerializerMethodField()
-
 
     class Meta:
         model = Patient
@@ -129,45 +135,47 @@ class PatientListCreateSerializer(PermissionCheckedSerializerMixin, serializers.
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at", "full_name", "age"]
-        
-        
+
     def validate(self, data):
         # Check create/update permissions based on whether instance exists
         is_update = self.instance is not None
-        
-        if is_update and not self.check_permission('view', 'patient'):
-            raise serializers.ValidationError({
-                "error": "You don't have permission to update patient information"
-            })
-        elif not is_update and not self.check_permission('add', 'patient'):
-            raise serializers.ValidationError({
-                "error": "You don't have permission to create patients"
-            })
+
+        if is_update and not self.check_permission("view", "patient"):
+            raise serializers.ValidationError(
+                {"error": "You don't have permission to update patient information"}
+            )
+        elif not is_update and not self.check_permission("add", "patient"):
+            raise serializers.ValidationError(
+                {"error": "You don't have permission to create patients"}
+            )
 
         # Validate demographics permissions
-        if 'demographics' in data:
-            if is_update and not self.check_permission('add', 'patientdemographics'):
-                raise serializers.ValidationError({
-                    "demographics": "You don't have permission to update demographics"
-                })
-            elif not is_update and not self.check_permission('view', 'patientdemographics'):
-                raise serializers.ValidationError({
-                    "demographics": "You don't have permission to add demographics"
-                })
+        if "demographics" in data:
+            if is_update and not self.check_permission("add", "patientdemographics"):
+                raise serializers.ValidationError(
+                    {"demographics": "You don't have permission to update demographics"}
+                )
+            elif not is_update and not self.check_permission(
+                "view", "patientdemographics"
+            ):
+                raise serializers.ValidationError(
+                    {"demographics": "You don't have permission to add demographics"}
+                )
 
         # Validate address permissions
-        if 'addresses' in data:
-            if is_update and not self.check_permission('change', 'patientaddress'):
-                raise serializers.ValidationError({
-                    "addresses": "You don't have permission to update addresses"
-                })
-            elif not is_update and not self.check_permission('add', 'patientaddress'):
-                raise serializers.ValidationError({
-                    "addresses": "You don't have permission to add addresses from validation"
-                })
+        if "addresses" in data:
+            if is_update and not self.check_permission("change", "patientaddress"):
+                raise serializers.ValidationError(
+                    {"addresses": "You don't have permission to update addresses"}
+                )
+            elif not is_update and not self.check_permission("add", "patientaddress"):
+                raise serializers.ValidationError(
+                    {
+                        "addresses": "You don't have permission to add addresses from validation"
+                    }
+                )
 
         return data
-
 
     def get_full_name(self, obj):
         if obj.middle_name:
@@ -176,8 +184,13 @@ class PatientListCreateSerializer(PermissionCheckedSerializerMixin, serializers.
 
     def get_age(self, obj):
         today = date.today()
-        return today.year - obj.date_of_birth.year - (
-            (today.month, today.day) < (obj.date_of_birth.month, obj.date_of_birth.day)
+        return (
+            today.year
+            - obj.date_of_birth.year
+            - (
+                (today.month, today.day)
+                < (obj.date_of_birth.month, obj.date_of_birth.day)
+            )
         )
 
     def get_primary_address(self, obj):
@@ -185,39 +198,39 @@ class PatientListCreateSerializer(PermissionCheckedSerializerMixin, serializers.
         if primary_address:
             return PatientAddressSerializer(primary_address).data
         return None
-    
+
     def validate_email(self, value):
-        instance = getattr(self, 'instance', None)
+        instance = getattr(self, "instance", None)
         if instance and instance.email == value:
             return value
-            
+
         if Patient.objects.filter(email=value).exists():
             raise serializers.ValidationError("This email is already in use.")
         return value
-    
+
     @transaction.atomic
     def create(self, validated_data):
-        demographics_data = validated_data.pop('demographics', None)
-        addresses_data = validated_data.pop('addresses', None)
+        demographics_data = validated_data.pop("demographics", None)
+        addresses_data = validated_data.pop("addresses", None)
 
         # Create the patient
         patient = Patient.objects.create(**validated_data)
 
         # Handle demographics if provided and permitted
-        if demographics_data and self.check_permission('add', 'patientdemographics'):
+        if demographics_data and self.check_permission("add", "patientdemographics"):
             PatientDemographics.objects.create(patient=patient, **demographics_data)
 
         # Handle addresses if provided and permitted
-        if addresses_data and self.check_permission('add', 'patientaddress'):
+        if addresses_data and self.check_permission("add", "patientaddress"):
             for address_data in addresses_data:
                 PatientAddress.objects.create(patient=patient, **address_data)
 
         return patient
-    
+
     @transaction.atomic
     def update(self, instance, validated_data):
-        demographics_data = validated_data.pop('demographics', None)
-        addresses_data = validated_data.pop('addresses', None)
+        demographics_data = validated_data.pop("demographics", None)
+        addresses_data = validated_data.pop("addresses", None)
 
         # Update patient fields
         for attr, value in validated_data.items():
@@ -225,28 +238,34 @@ class PatientListCreateSerializer(PermissionCheckedSerializerMixin, serializers.
         instance.save()
 
         # Update demographics if provided and permitted
-        if demographics_data and self.check_permission('change', 'patientdemographics'):
+        if demographics_data and self.check_permission("change", "patientdemographics"):
             demographics = instance.demographics
             for attr, value in demographics_data.items():
                 setattr(demographics, attr, value)
             demographics.save()
 
         # Update addresses if provided and permitted
-        if addresses_data is not None and self.check_permission('change', 'patientaddress'):
+        if addresses_data is not None and self.check_permission(
+            "change", "patientaddress"
+        ):
             instance.addresses.all().delete()
             for address_data in addresses_data:
                 PatientAddress.objects.create(patient=instance, **address_data)
 
         return instance
-    
+
     def to_representation(self, instance):
         """
         Optimize query for list view by using select_related and prefetch_related
         """
         representation = super().to_representation(instance)
-        
+
         # If this is a list view (multiple instances), we've already prefetched the related data
-        if not hasattr(instance, '_prefetched_objects_cache'):
-            instance = Patient.objects.select_related('demographics').prefetch_related('addresses').get(id=instance.id)
-        
+        if not hasattr(instance, "_prefetched_objects_cache"):
+            instance = (
+                Patient.objects.select_related("demographics")
+                .prefetch_related("addresses")
+                .get(id=instance.id)
+            )
+
         return representation
