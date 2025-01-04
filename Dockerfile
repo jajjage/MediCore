@@ -13,7 +13,7 @@ ENV PYTHONUNBUFFERED=1 \
     PATH="${POETRY_HOME}/bin:$PATH"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl build-essential libpq-dev \
+    git curl build-essential libpq-dev openssh-client \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir wheel \
     && curl -sSL https://install.python-poetry.org | python3 -

@@ -28,7 +28,7 @@ class PatientViewSet(ModelViewSet):
         return context
 
     @action(detail=True, methods=["patch"])
-    def update_demographics(self, request, pk=None):  # noqa: ARG002
+    def update_demographics(self, request, pk=None):
         patient = self.get_object()
         user_role = request.user.role
         permissions = ROLE_PERMISSIONS.get(user_role, {})

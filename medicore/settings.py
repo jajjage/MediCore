@@ -121,6 +121,8 @@ CACHES = {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
         "KEY_PREFIX": "medicore",  # Optional, helps avoid key collisions
+        "KEY_FUNCTION": "django_tenants.cache.make_key",
+        "REVERSE_KEY_FUNCTION": "django_tenants.cache.reverse_key",
     }
 }
 
@@ -163,6 +165,7 @@ JWT_REFRESH_TOKEN_LIFETIME = timedelta(days=1)
 JWT_AUTH_SECURE = False
 JWT_AUTH_SAMESITE = "Lax"
 JWT_AUTH_HTTPONLY = True
+JWT_AUTH_PATH = "/"
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": JWT_ACCESS_TOKEN_LIFETIME,
@@ -199,6 +202,7 @@ DJOSER = {
         "current_user": "apps.staff.serializers.StaffSerializer",
     },
 }
+
 
 # Custom authentication backend
 AUTHENTICATION_BACKENDS = (
@@ -266,7 +270,7 @@ CORS_ALLOW_METHODS = [
 CORS_ALLOW_CREDENTIALS = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-
+CSRF_TRUSTED_ORIGINS = ["https://.medicore.local"]
 # Ensure cookies are allowed
 CORS_ALLOW_HEADERS = [
     "content-type",

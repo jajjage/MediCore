@@ -111,11 +111,13 @@ class PatientListCreateSerializer(
     full_name = serializers.SerializerMethodField()
     age = serializers.SerializerMethodField()
     primary_address = serializers.SerializerMethodField()
+    pin = serializers.SerializerMethodField()
 
     class Meta:
         model = Patient
         fields = [
             "id",
+            "pin",
             "first_name",
             "middle_name",
             "last_name",
@@ -177,10 +179,27 @@ class PatientListCreateSerializer(
 
         return data
 
+    def get_pin(self, obj):
+        request = self.context.get("request")
+        if not request:
+            return None
+        try:
+            return obj.generate_pin(request)
+        except ValueError as e:
+            # Handle the error appropriately
+            raise serializers.ValidationError from e
+
     def get_full_name(self, obj):
         if obj.middle_name:
             return f"{obj.first_name} {obj.middle_name} {obj.last_name}".strip()
         return f"{obj.first_name} {obj.last_name}".strip()
+
+    def validate_gender(self, value):
+        if value not in dict(Patient.GENDER_CHOICES):
+            raise serializers.ValidationError(
+                f"'{value}' is not a valid gender. Use one of {list(dict(Patient.GENDER_CHOICES).keys())}."
+            )
+        return value
 
     def get_age(self, obj):
         today = date.today()  # noqa: DTZ011

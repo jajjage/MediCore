@@ -15,6 +15,7 @@ from rest_framework_simplejwt.views import (
 
 logger = logging.getLogger(__name__)
 
+
 class CookieTokenMixin:
     def set_auth_cookies(self, response, access_token=None, refresh_token=None):
         if access_token:
@@ -42,6 +43,7 @@ class CookieTokenMixin:
             )
 
         return response
+
 
 class CookieTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
@@ -73,7 +75,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
                 secure=settings.JWT_AUTH_SECURE,
                 httponly=settings.JWT_AUTH_HTTPONLY,
                 samesite=settings.JWT_AUTH_SAMESITE,
-                path="/",
+                path=settings.JWT_AUTH_PATH,
             )
 
             # Set refresh token cookie
@@ -84,7 +86,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
                 secure=settings.JWT_AUTH_SECURE,
                 httponly=settings.JWT_AUTH_HTTPONLY,
                 samesite=settings.JWT_AUTH_SAMESITE,
-                path="/",
+                path=settings.JWT_AUTH_PATH,
             )
 
             # Remove tokens from response data for security
@@ -107,21 +109,20 @@ class CookieTokenRefreshView(TokenRefreshView):
         if not refresh_token:
             return Response(
                 {"detail": "No refresh token found"},
-                status=status.HTTP_401_UNAUTHORIZED
+                status=status.HTTP_401_UNAUTHORIZED,
             )
 
         if self._is_token_blacklisted(refresh_token):
             return Response(
-                {"detail": "Token is blacklisted"},
-                status=status.HTTP_401_UNAUTHORIZED
+                {"detail": "Token is blacklisted"}, status=status.HTTP_401_UNAUTHORIZED
             )
 
         try:
-            #Rate limiting check
+            # Rate limiting check
             if not self._check_rate_limit(refresh_token):
                 return Response(
                     {"detail": "Too many refresh attempts"},
-                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
 
             # Validate and get new tokens
@@ -133,15 +134,12 @@ class CookieTokenRefreshView(TokenRefreshView):
                 return response
 
         except TokenError as e:
-            return Response(
-                {"detail": str(e)},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
             logger.error("Token refresh error: %s", e, exc_info=True)  # noqa: G201
             return Response(
                 {"detail": "Token refresh failed"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     def _is_token_blacklisted(self, token, cache_timeout=300):
@@ -167,7 +165,7 @@ class CookieTokenRefreshView(TokenRefreshView):
                 httponly=settings.JWT_AUTH_HTTPONLY,
                 secure=settings.JWT_AUTH_SECURE,
                 samesite=settings.JWT_AUTH_SAMESITE,
-                path="/",
+                path=settings.JWT_AUTH_PATH,
             )
             response.data.pop("access")
 
@@ -179,7 +177,7 @@ class CookieTokenRefreshView(TokenRefreshView):
                 httponly=settings.JWT_AUTH_HTTPONLY,
                 secure=settings.JWT_AUTH_SECURE,
                 samesite=settings.JWT_AUTH_SAMESITE,
-                path="/",
+                path=settings.JWT_AUTH_PATH,
             )
             response.data.pop("refresh")
 

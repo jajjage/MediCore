@@ -52,7 +52,8 @@ class StaffMemberAdmin(UserAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         """
-        Customize the form to associate the department with the current schema's hospital
+        Customize the form to associate the department with the current schema's hospital.
+
         and make the 'hospital' field readonly or hidden.
         """
         form = super().get_form(request, obj, **kwargs)
@@ -111,7 +112,8 @@ class DepartmentAdmin(admin.ModelAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         """
-        Customize the form to associate the department with the current schema's hospital
+        Customize the form to associate the department with the current schema's hospital.
+
         and make the 'hospital' field readonly or hidden.
         """
         form = super().get_form(request, obj, **kwargs)
