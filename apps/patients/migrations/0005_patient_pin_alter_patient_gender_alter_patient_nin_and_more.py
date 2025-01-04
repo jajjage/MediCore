@@ -10,15 +10,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL(
-            sql="CREATE INDEX patient_pin_lower_idx ON patients (LOWER(pin));",
-            reverse_sql="DROP INDEX patient_pin_lower_idx;",
-        ),
-         migrations.AlterField(
-            model_name="patient",
-            name="pin",
-            field=models.CharField(max_length=15, unique=True, null=True, blank=True),
-        ),
         migrations.AddField(
             model_name="patient",
             name="pin",
@@ -26,7 +17,7 @@ class Migration(migrations.Migration):
                 db_index=True,
                 default=737823328,
                 editable=False,
-                max_length=10,
+                max_length=20,
                 unique=True,
             ),
             preserve_default=False,

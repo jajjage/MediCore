@@ -1,12 +1,13 @@
-import secrets
+
 import uuid
 
-from django.db import models, transaction
+from django.db import connection, models
 
 from utils.encryption import encrypt_sensitive_fields, field_encryption
 
 
 class Patient(models.Model):
+    MAX_PIN_LENGTH = 15
 
     GENDER_CHOICES = [
         ("M", "Male"),
@@ -15,7 +16,7 @@ class Patient(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    pin = models.CharField(max_length=15, unique=True, editable=False, db_index=True)  # Unique Identifier
+    pin = models.CharField(max_length=20, unique=True, editable=False, db_index=True)  # Unique Identifier
     first_name = models.CharField(max_length=100)
     middle_name = models.CharField(max_length=100, blank=True, null=True)
     last_name = models.CharField(max_length=100)
@@ -60,32 +61,24 @@ class Patient(models.Model):
         Format: XXXXX-NNNNNN (where X is hospital code and N is number).
         """
         if not self.pin:
-            with transaction.atomic():
-                # Get the host and extract relevant parts for the hospital code
-                host = request.get_host().split(":")[0]
-                subdomain = host.split(".")[0]
-                # Make sure hospital code is exactly 5 characters
-                hospital_code = f"{subdomain[:3].upper()}{subdomain[-2:].upper()}"[:5]
-                hospital_code = hospital_code.ljust(5, "X")  # Pad with X if too short
+            # Get hospital code
+            host = request.get_host().split(":")[0]
+            subdomain = host.split(".")[0]
+            hospital_code = subdomain[:3].upper()
 
-                # Generate a 6-digit PIN
-                max_attempts = 10
-                attempts = 0
+            # Get next sequence value
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT nextval('patient_pin_seq_middle')")
+                middle_val = cursor.fetchone()[0]
 
-                while attempts < max_attempts:
-                    pin_numbers = "".join(str(secrets.randbelow(10)) for _ in range(6))
-                    complete_pin = f"{hospital_code}-{pin_numbers}"
+                cursor.execute("SELECT nextval('patient_pin_seq_last')")
+                last_val = cursor.fetchone()[0]
 
-                    # Check if this PIN is unique
-                    if not Patient.objects.filter(pin=complete_pin).exists():
-                        self.pin = complete_pin
-                        self.save()
-                        return complete_pin
+            # Format PIN with the new structure
+            self.pin = f"{hospital_code}-{middle_val:04d}-{last_val:04d}"
+            self.save(update_fields=["pin"])
 
-                    attempts += 1
-                raise ValueError("Failed to generate a unique PIN after maximum attempts")
         return self.pin
-
 
 class PatientDemographics(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -153,7 +146,7 @@ class PatientMedicalReport(models.Model):
         on_delete=models.CASCADE,
         related_name="reports"
     )
-    title = models.CharField(max_length=255)  # E.g., "Diagnosis", "Follow-Up Notes"
+    title = models.CharField(max_length=255, blank=True,   null=True)  # E.g., "Diagnosis", "Follow-Up Notes"
     description = models.TextField()  # The doctor's notes or observations
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

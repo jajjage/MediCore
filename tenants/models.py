@@ -1,7 +1,7 @@
 import uuid
+
 from django.db import models
-from core.models import MyUser
-from django_tenants.models import TenantMixin, DomainMixin
+from django_tenants.models import DomainMixin, TenantMixin
 
 
 class Client(TenantMixin):

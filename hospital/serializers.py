@@ -1,7 +1,9 @@
 from rest_framework import serializers
-from .models import HospitalProfile
-from tenants.serializers import TenantSerializer
+
 from core.serializers import AdminUserSerializer
+from tenants.serializers import TenantSerializer
+
+from .models import HospitalProfile
 
 
 class HospitalProfileSerializer(serializers.ModelSerializer):
@@ -26,7 +28,6 @@ class HospitalProfileSerializer(serializers.ModelSerializer):
 
 class CreateTenantRequestSerializer(serializers.Serializer):
     # Tenant data
-    schema_name = serializers.CharField(max_length=100)
     tenant_name = serializers.CharField(max_length=100)
     paid_until = serializers.DateField()
     on_trial = serializers.BooleanField(default=True)

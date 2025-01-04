@@ -11,5 +11,6 @@
       "username": "medicore_user",
       "database": "medicore_db"
     }
-  ]
+  ],
+  "python.analysis.extraPaths": ["./apps"]
 }
