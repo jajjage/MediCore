@@ -2,6 +2,8 @@ import uuid
 
 from django.core.validators import RegexValidator
 from django.db import connection, models
+from django.db.models import Q
+from django.utils.timezone import now
 from simple_history.models import HistoricalRecords
 
 from utils.encryption import field_encryption
@@ -91,8 +93,31 @@ class Patient(models.Model):
             # Format PIN with the new structure
             self.pin = f"{hospital_code}-{middle_val:04d}-{last_val:04d}"
             self.save(update_fields=["pin"])
-
         return self.pin
+
+    def calculate_age(self):
+        today = now().date()
+        return (
+            today.year
+            - self.date_of_birth.year
+            - (
+                (today.month, today.day)
+                < (self.date_of_birth.month, self.date_of_birth.day)
+            )
+        )
+
+    @classmethod
+    def search(cls, query):
+        """
+        Centralized search method for patients.
+        """
+        return cls.objects.filter(
+            Q(pin__icontains=query)
+            | Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(email__icontains=query)
+            | Q(phone_primary__icontains=query)
+        ).select_related("demographics")
 
 
 class PatientEmergencyContact(models.Model):

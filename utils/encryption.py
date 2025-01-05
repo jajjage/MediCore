@@ -1,8 +1,9 @@
 # utils/encryption.py
 
+from functools import wraps
+
 from cryptography.fernet import Fernet
 from django.conf import settings
-from functools import wraps
 
 
 class FieldEncryption:

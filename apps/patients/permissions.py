@@ -110,6 +110,7 @@ class RolePermission(BasePermission):
             "update": "change",
             "partial_update": "change",
             "destroy": "delete",
+            "search": "view",
         }
         permission = action_to_permission.get(action)
         if not permission:

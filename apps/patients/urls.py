@@ -45,6 +45,7 @@ report_router.register(
     r"reports", PatientMedicalReportViewSet, basename="patient-medical-report"
 )
 
+
 urlpatterns = [
     path("", include(router.urls)),
     path("", include(demographics_router.urls)),

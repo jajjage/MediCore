@@ -1,10 +1,13 @@
+from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404
-from rest_framework import status
+from rest_framework import generics, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+
+from apps.patients.cached.patient_search import CachedPatientSearchMixin
 
 from .models import (
     Patient,
@@ -23,6 +26,7 @@ from .serializers import (
     PatientDemographicsSerializer,
     PatientEmergencyContactSerializer,
     PatientMedicalReportSerializer,
+    PatientSearchSerializer,
 )
 
 
@@ -145,6 +149,22 @@ class PatientViewSet(ModelViewSet):
         serializer.save(patient=patient)
         return Response(serializer.data)
 
+    @action(detail=False, methods=["get"], url_path="search")
+    def search(self, request):
+        query = request.query_params.get("q", "").strip()
+        if not query:
+            return Response([])
+
+        queryset = self.get_queryset().filter(
+            Q(pin__icontains=query)
+            | Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(email__icontains=query)
+            | Q(phone_primary__icontains=query)
+        )
+        serializer = PatientSearchSerializer(queryset, many=True)
+        return Response(serializer.data)
+
 
 class PatientDemographicsViewSet(ModelViewSet):
     """ViewSet for PatientDemographics model with role-based permissions."""
@@ -228,3 +248,32 @@ class PatientMedicalReportViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(patient_id=self.kwargs.get("patient__pk"))
+
+
+class PatientSearchView(CachedPatientSearchMixin, generics.ListAPIView):
+    serializer_class = PatientSearchSerializer
+    permission_classes = [RolePermission]
+
+    def get_queryset(self):
+        query = self.request.query_params.get("q", "").strip()
+        if not query:
+            return Patient.objects.none()
+
+        # Try to get cached results first
+        cached_results = self.get_cached_results(query)
+        if cached_results is not None:
+            return cached_results
+
+        # Perform the search
+        queryset = Patient.objects.filter(
+            Q(pin__icontains=query)
+            | Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(email__icontains=query)
+            | Q(phone_primary__icontains=query)
+        ).select_related("demographics")
+
+        # Cache the results
+        self.set_cached_results(query, queryset)
+
+        return queryset

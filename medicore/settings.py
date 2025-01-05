@@ -129,7 +129,15 @@ CACHES = {
     }
 }
 
+CACHE_TIMEOUTS = {
+    "PATIENT_SEARCH": 3600,  # 1 hour
+    "PATIENT_DETAIL": 86400,  # 24 hours
+}
 
+CACHE_KEYS = {
+    "PATIENT_SEARCH": "patient_search:{query}",
+    "PATIENT_DETAIL": "patient_detail:{id}",
+}
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
