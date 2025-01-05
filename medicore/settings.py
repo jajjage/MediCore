@@ -29,11 +29,13 @@ DEFAULT_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # Third party apps
     "rest_framework",
     "rest_framework.authtoken",
     "djoser",
     "rest_framework_simplejwt",
     "corsheaders",
+    "simple_history",
 ]
 
 # Apps that are specific to individual tenants
@@ -68,6 +70,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "medicore.middleware.AdminAccessMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "medicore.middleware.DynamicAuthModelMiddleware",
 ]
@@ -268,9 +271,10 @@ CORS_ALLOW_METHODS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-CSRF_TRUSTED_ORIGINS = ["https://.medicore.local"]
+SESSION_COOKIE_SECURE = env("SESSION_COOKIE_SECURE", default=True)
+CSRF_TRUSTED_ORIGINS = ["http://*", "https://*"]
+ALLOWED_ORIGINS = CSRF_TRUSTED_ORIGINS.copy()
+
 # Ensure cookies are allowed
 CORS_ALLOW_HEADERS = [
     "content-type",
