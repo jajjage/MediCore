@@ -12,6 +12,7 @@ from apps.patients.models import (
     PatientDemographics,
     PatientEmergencyContact,
     PatientMedicalReport,
+    PatientVisit,
 )
 from apps.staff.models import StaffRole
 from tenants.models import Client
@@ -35,6 +36,7 @@ class Command(BaseCommand):
                     "patientdemographics": ["view", "add", "change"],
                     "patientemergencycontact": ["view"],
                     "patientmedicalreport": ["view", "add", "change"],
+                    "patientvisit": ["view", "add", "change"],
                 },
             },
             "HEAD_DOCTOR": {
@@ -47,6 +49,7 @@ class Command(BaseCommand):
                     "patientdemographics": ["view", "add", "change", "delete"],
                     "patientemergencycontact": ["view", "add", "change", "delete"],
                     "patientmedicalreport": ["view", "add", "change", "delete"],
+                    "patientvisit": ["view", "add", "change"],
                 },
             },
             "NURSE": {
@@ -59,6 +62,7 @@ class Command(BaseCommand):
                     "patientdemographics": ["view", "add"],
                     "patientemergencycontact": ["view"],
                     "patientmedicalreport": ["view"],
+                    "patientvisit": ["view", "add", "change"],
                 },
             },
             "LAB_TECHNICIAN": {
@@ -71,6 +75,7 @@ class Command(BaseCommand):
                     "patientdemographics": ["view"],
                     "patientemergencycontact": ["view"],
                     "patientmedicalreport": ["view", "add", "change"],
+                    "patientvisit": ["view", "add", "change"],
                 },
             },
             "PHARMACIST": {
@@ -83,6 +88,7 @@ class Command(BaseCommand):
                     "patientdemographics": ["view"],
                     "patientemergencycontact": ["view"],
                     "patientmedicalreport": ["view"],
+                    "patientvisit": ["view", "add", "change"],
                 },
             },
         }
@@ -128,7 +134,7 @@ class Command(BaseCommand):
 
         except Exception as e:
             self.stdout.write(
-                self.style.ERROR("Error during staff roles setup: %s", str(e))
+                self.style.ERROR(f"Error during staff roles setup: {e}")
             )
             raise
 
@@ -149,6 +155,9 @@ class Command(BaseCommand):
             ),
             "patientmedicalreport": ContentType.objects.get_for_model(
                 PatientMedicalReport
+            ),
+            "patientvisit": ContentType.objects.get_for_model(
+                PatientVisit
             ),
         }
 

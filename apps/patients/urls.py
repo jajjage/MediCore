@@ -5,10 +5,14 @@ from rest_framework_nested import routers
 from .views import (
     PatientAddressViewSet,
     PatientAllergyViewSet,
+    PatientAppointmentViewSet,
     PatientChronicConditionViewSet,
     PatientDemographicsViewSet,
+    PatientDiagnosisViewSet,
     PatientMedicalReportViewSet,
+    PatientOperationViewSet,
     PatientViewSet,
+    PatientVisitViewSet,
 )
 
 # Parent router for patients
@@ -45,6 +49,26 @@ report_router.register(
     r"reports", PatientMedicalReportViewSet, basename="patient-medical-report"
 )
 
+visit_router = routers.NestedSimpleRouter(router, r"patients", lookup="patient")
+visit_router.register(
+    r"visits", PatientVisitViewSet, basename="patient-visit"
+)
+
+operarion_router = routers.NestedSimpleRouter(router, r"patients", lookup="patient")
+operarion_router.register(
+    r"operations", PatientOperationViewSet, basename="patient-operation"
+)
+
+appointment_router = routers.NestedSimpleRouter(router, r"patients", lookup="patient")
+appointment_router.register(
+    r"appointments", PatientAppointmentViewSet, basename="patient-appointment"
+)
+
+diagnosis_router = routers.NestedSimpleRouter(router, r"patients", lookup="patient")
+diagnosis_router.register(
+    r"diagnosis", PatientDiagnosisViewSet, basename="patient-diagnosis"
+)
+
 
 urlpatterns = [
     path("", include(router.urls)),
@@ -53,4 +77,8 @@ urlpatterns = [
     path("", include(allergy_router.urls)),
     path("", include(condition_router.urls)),
     path("", include(report_router.urls)),
+    path("", include(visit_router.urls)),
+    path("", include(operarion_router.urls)),
+    path("", include(appointment_router.urls)),
+    path("", include(diagnosis_router.urls)),
 ]

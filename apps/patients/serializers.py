@@ -2,24 +2,27 @@ from django.db import transaction
 from django.utils.timezone import now
 from rest_framework import serializers
 
-from apps.patients.mixins.patients_mixins import (
+from .mixins.patients_mixins import (
     PatientCalculationMixin,
     PatientCreateMixin,
     PatientRelatedOperationsMixin,
     PatientUpdateMixin,
 )
-from apps.patients.model_perm import check_model_permissions
-from apps.patients.permissions import PermissionCheckedSerializerMixin
-
+from .model_perm import check_model_permissions
 from .models import (
     Patient,
     PatientAddress,
     PatientAllergy,
+    PatientAppointment,
     PatientChronicCondition,
     PatientDemographics,
+    PatientDiagnosis,
     PatientEmergencyContact,
     PatientMedicalReport,
+    PatientOperation,
+    PatientVisit,
 )
+from .permissions import PermissionCheckedSerializerMixin
 
 
 class BasePatientSerializer(
@@ -171,6 +174,171 @@ class PatientMedicalReportSerializer(BasePatientSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
+class PatientVisitSerializer(BasePatientSerializer):
+    """
+    Serializer for patient visits with validation and history tracking.
+    """
+
+    class Meta:
+        model = PatientVisit
+        fields = [
+            "id",
+            "patient",
+            "visit_date",
+            "physician",
+            "ward_or_clinic",
+            "discharge_date",
+            "discharge_notes",
+            "referred_by",
+        ]
+        read_only_fields = ["id"]
+
+    def validate(self, data):
+        """
+        Validate visit dates and permissions.
+        """
+        visit_date = data.get("visit_date")
+        discharge_date = data.get("discharge_date")
+
+        if visit_date and discharge_date and discharge_date < visit_date:
+            raise serializers.ValidationError({
+                "discharge_date": "Discharge date cannot be earlier than visit date."
+            })
+
+        # Ensure user has proper permissions
+        if self.instance:
+            if not self.check_permission("change", "patientvisit"):
+                raise serializers.ValidationError(
+                    {"error": "You don't have permission to update visits"}
+                )
+        elif not self.check_permission("add", "patientvisit"):
+            raise serializers.ValidationError(
+                {"error": "You don't have permission to add visits"}
+            )
+
+        return data
+
+    def to_representation(self, instance):
+        """
+        Control data visibility based on permissions.
+        """
+        if not self.check_permission("view", "patientvisit"):
+            return {}
+        return super().to_representation(instance)
+
+class PatientOperationSerializer(BasePatientSerializer):
+    """
+    Serializer for patient operations with validation and history tracking.
+    """
+
+    class Meta:
+        model = PatientOperation
+        fields = [
+            "id",
+            "patient",
+            "operation_date",
+            "surgeon",
+            "operation_name",
+            "operation_code",
+            "notes",
+        ]
+        read_only_fields = ["id"]
+
+    def validate_operation_date(self, value):
+        """Validate operation date is not in the future."""
+        return self.validate_date_not_future(value, "Operation date")
+
+    def validate(self, data):
+        """Validate operation data and permissions."""
+        if self.instance:
+            if not self.check_permission("change", "patientoperation"):
+                raise serializers.ValidationError(
+                    {"error": "You don't have permission to update operations"}
+                )
+        elif not self.check_permission("add", "patientoperation"):
+            raise serializers.ValidationError(
+                {"error": "You don't have permission to add operations"}
+            )
+
+        return data
+
+class PatientDiagnosisSerializer(BasePatientSerializer):
+    """
+    Serializer for patient diagnoses with validation and history tracking.
+    """
+
+    class Meta:
+        model = PatientDiagnosis
+        fields = [
+            "id",
+            "patient",
+            "diagnosis_date",
+            "diagnosis_name",
+            "icd_code",
+            "notes",
+        ]
+        read_only_fields = ["id"]
+
+    def validate_diagnosis_date(self, value):
+        """Validate diagnosis date is not in the future."""
+        return self.validate_date_not_future(value, "Diagnosis date")
+
+    def validate(self, data):
+        """Validate diagnosis data and permissions."""
+        if self.instance:
+            if not self.check_permission("change", "patientdiagnosis"):
+                raise serializers.ValidationError(
+                    {"error": "You don't have permission to update diagnoses"}
+                )
+        elif not self.check_permission("add", "patientdiagnosis"):
+            raise serializers.ValidationError(
+                {"error": "You don't have permission to add diagnoses"}
+            )
+
+        return data
+
+class PatientAppointmentSerializer(BasePatientSerializer):
+    """
+    Serializer for patient appointments with validation and history tracking.
+    """
+
+    class Meta:
+        model = PatientAppointment
+        fields = [
+            "id",
+            "patient",
+            "appointment_date",
+            "reason",
+            "physician",
+            "status",
+            "notes",
+        ]
+        read_only_fields = ["id"]
+
+    def validate_status(self, value):
+        """Validate appointment status."""
+        valid_statuses = dict(PatientAppointment._meta.get_field("status").choices)
+        if value not in valid_statuses:
+            raise serializers.ValidationError(
+                f"'{value}' is not a valid status. Use one of {list(valid_statuses.keys())}."
+            )
+        return value
+
+    def validate(self, data):
+        """
+        Validate appointment data and permissions.
+        """
+        if self.instance:
+            if not self.check_permission("change", "patientappointment"):
+                raise serializers.ValidationError(
+                    {"error": "You don't have permission to update appointments"}
+                )
+        elif not self.check_permission("add", "patientappointment"):
+            raise serializers.ValidationError(
+                {"error": "You don't have permission to add appointments"}
+            )
+
+        return data
 class CompletePatientSerializer(
     BasePatientSerializer,
     PatientCalculationMixin,
@@ -186,6 +354,10 @@ class CompletePatientSerializer(
     demographics = PatientDemographicsSerializer(required=False)
     addresses = PatientAddressSerializer(many=True, required=False)
     medical_reports = PatientMedicalReportSerializer(many=True, required=False)
+    visits = PatientVisitSerializer(many=True, read_only=True)
+    operations = PatientOperationSerializer(many=True, read_only=True)
+    diagnoses = PatientDiagnosisSerializer(many=True, read_only=True)
+    appointments = PatientAppointmentSerializer(many=True, read_only=True)
     full_name = serializers.SerializerMethodField()
     age = serializers.SerializerMethodField()
     pin = serializers.SerializerMethodField()
@@ -215,6 +387,10 @@ class CompletePatientSerializer(
             "demographics",
             "addresses",
             "medical_reports",
+            "visits",
+            "operations",
+            "diagnoses",
+            "appointments"
         ]
         read_only_fields = ["id", "pin", "created_at", "updated_at"]
 

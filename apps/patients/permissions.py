@@ -15,6 +15,7 @@ ROLE_PERMISSIONS = {
             "patientdemographics": ["view", "add", "change"],
             "patientemergencycontact": ["view"],
             "patientmedicalreport": ["view", "add", "change"],
+            "patientvisit": ["view", "add", "change"],
         },
     },
     "HEAD_DOCTOR": {
@@ -27,6 +28,7 @@ ROLE_PERMISSIONS = {
             "patientdemographics": ["view", "add", "change", "delete"],
             "patientemergencycontact": ["view", "add", "change", "delete"],
             "patientmedicalreport": ["view", "add", "change", "delete"],
+            "patientvisit": ["view", "add", "change"],
         },
     },
     "NURSE": {
@@ -39,6 +41,7 @@ ROLE_PERMISSIONS = {
             "patientdemographics": ["view", "add"],
             "patientemergencycontact": ["view"],
             "patientmedicalreport": ["view"],
+            "patientvisit": ["view", "add", "change"],
         },
     },
     "LAB_TECHNICIAN": {
@@ -51,6 +54,7 @@ ROLE_PERMISSIONS = {
             "patientdemographics": ["view"],
             "patientemergencycontact": ["view"],
             "patientmedicalreport": ["view", "add", "change"],
+            "patientvisit": ["view", "add", "change"],
         },
     },
     "PHARMACIST": {
@@ -63,6 +67,7 @@ ROLE_PERMISSIONS = {
             "patientdemographics": ["view"],
             "patientemergencycontact": ["view"],
             "patientmedicalreport": ["view"],
+            "patientvisit": ["view", "add", "change"],
         },
     },
 }
@@ -94,13 +99,14 @@ class RolePermission(BasePermission):
             print(f"Role {user_role} not in ROLE_PERMISSIONS")
             return False
 
+        if not hasattr(view, "basename") or not hasattr(view, "action"):
+            print("no action")
+            return False
+
         resource = view.basename
         resource_ = resource.replace("-", " ")
         normalized_resource = "".join(word for word in resource_.split())
         action = view.action
-
-        # Debug print
-        print(f"Normalized resource: {normalized_resource}")
 
         # Map DRF actions to permissions
         action_to_permission = {
@@ -111,11 +117,13 @@ class RolePermission(BasePermission):
             "partial_update": "change",
             "destroy": "delete",
             "search": "view",
+            # Add any custom actions here
+            "custom_action": "view",  # Example custom action
         }
+
         permission = action_to_permission.get(action)
         if not permission:
-            return False
-
+             return False
         cache_key = f"user_role_permissions_{user_role}"
         # Check cache first
         permissions = cache.get(cache_key)
@@ -138,6 +146,7 @@ class RolePermission(BasePermission):
 
         # Check if the user's role has the required permission
         model_permissions = permissions.get(normalized_resource, [])
+        print(model_permissions)
         if not model_permissions:
             allowed_permissions = ROLE_PERMISSIONS.get(user_role, {}).get(
                 "permissions", {}
@@ -177,7 +186,7 @@ class PermissionCheckedSerializerMixin:
             permissions_dict = convert_queryset_to_role_permissions(
                 permissions_queryset
             )
-            cache.set(cache_key, permissions_dict, timeout=3600)
+            cache.set(cache_key, permissions_dict, timeout=36)
             permissions = permissions_dict
 
         # Debug print

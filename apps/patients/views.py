@@ -1,32 +1,38 @@
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, status
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from apps.patients.cached.patient_search import CachedPatientSearchMixin
-
 from .models import (
     Patient,
     PatientAddress,
     PatientAllergy,
+    PatientAppointment,
     PatientChronicCondition,
     PatientDemographics,
+    PatientDiagnosis,
     PatientMedicalReport,
+    PatientOperation,
+    PatientVisit,
 )
 from .permissions import ROLE_PERMISSIONS, RolePermission
 from .serializers import (
     CompletePatientSerializer,
     PatientAddressSerializer,
     PatientAllergySerializer,
+    PatientAppointmentSerializer,
     PatientChronicConditionSerializer,
     PatientDemographicsSerializer,
+    PatientDiagnosisSerializer,
     PatientEmergencyContactSerializer,
     PatientMedicalReportSerializer,
+    PatientOperationSerializer,
     PatientSearchSerializer,
+    PatientVisitSerializer,
 )
 
 
@@ -249,31 +255,71 @@ class PatientMedicalReportViewSet(ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(patient_id=self.kwargs.get("patient__pk"))
 
+class PatientVisitViewSet(ModelViewSet):
+    """
+    ViewSet for managing patient visits.
+    """
 
-class PatientSearchView(CachedPatientSearchMixin, generics.ListAPIView):
-    serializer_class = PatientSearchSerializer
     permission_classes = [RolePermission]
+    serializer_class = PatientVisitSerializer
+    basename = "patientcisit"
 
     def get_queryset(self):
-        query = self.request.query_params.get("q", "").strip()
-        if not query:
-            return Patient.objects.none()
+        return PatientVisit.objects.filter(patient_id=self.kwargs.get("patient__pk"))
 
-        # Try to get cached results first
-        cached_results = self.get_cached_results(query)
-        if cached_results is not None:
-            return cached_results
+    def perform_create(self, serializer):
+        """
+        Save the patient visit record.
+        """
+        serializer.save(patient_id=self.kwargs.get("patient__pk"))
 
-        # Perform the search
-        queryset = Patient.objects.filter(
-            Q(pin__icontains=query)
-            | Q(first_name__icontains=query)
-            | Q(last_name__icontains=query)
-            | Q(email__icontains=query)
-            | Q(phone_primary__icontains=query)
-        ).select_related("demographics")
+class PatientOperationViewSet(ModelViewSet):
+    """
+    ViewSet for managing patient operations.
+    """
 
-        # Cache the results
-        self.set_cached_results(query, queryset)
+    permission_classes = [RolePermission]
+    serializer_class = PatientOperationSerializer
 
-        return queryset
+    def get_queryset(self):
+        return PatientOperation.objects.filter(patient_id=self.kwargs.get("patient__pk"))
+
+    def perform_create(self, serializer):
+        """
+        Save the patient operation record.
+        """
+        serializer.save(patient_id=self.kwargs.get("patient__pk"))
+
+class PatientDiagnosisViewSet(ModelViewSet):
+    """
+    ViewSet for managing patient diagnoses.
+    """
+
+    permission_classes = [RolePermission]
+    serializer_class = PatientDiagnosisSerializer
+
+    def get_queryset(self):
+        return PatientDiagnosis.objects.filter(patient_id=self.kwargs.get("patient__pk"))
+
+    def perform_create(self, serializer):
+        """
+        Save the patient diagnosis record.
+        """
+        serializer.save(patient_id=self.kwargs.get("patient__pk"))
+
+class PatientAppointmentViewSet(ModelViewSet):
+    """
+    ViewSet for managing patient appointments.
+    """
+
+    permission_classes = [RolePermission]
+    serializer_class = PatientAppointmentSerializer
+
+    def get_queryset(self):
+        return PatientAppointment.objects.filter(patient_id=self.kwargs.get("patient__pk"))
+
+    def perform_create(self, serializer):
+        """
+        Save the patient appointment record.
+        """
+        serializer.save(patient_id=self.kwargs.get("patient__pk"))
