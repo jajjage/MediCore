@@ -23,7 +23,7 @@ BASE_URL = env("BASE_URL", default="http://.medicore.local:8000/api/v1/")
 # Application definition
 # List of default Django apps and third-party apps that are common to both shared and tenant apps
 DEFAULT_APPS = [
-    "django.contrib.admin",
+    "medicore.admin_config.CustomAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -61,6 +61,7 @@ SHARED_APPS = [
 INSTALLED_APPS = list(set(SHARED_APPS) | set(TENANT_APPS))
 
 MIDDLEWARE = [
+    "medicore.middleware.PublicSchemaMiddleware",
     "django_tenants.middleware.main.TenantMainMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -73,6 +74,7 @@ MIDDLEWARE = [
     "simple_history.middleware.HistoryRequestMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "medicore.middleware.DynamicAuthModelMiddleware",
+
 ]
 
 ROOT_URLCONF = "medicore.urls"

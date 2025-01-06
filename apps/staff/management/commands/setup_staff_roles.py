@@ -8,10 +8,13 @@ from apps.patients.models import (
     Patient,
     PatientAddress,
     PatientAllergy,
+    PatientAppointment,
     PatientChronicCondition,
     PatientDemographics,
+    PatientDiagnosis,
     PatientEmergencyContact,
     PatientMedicalReport,
+    PatientOperation,
     PatientVisit,
 )
 from apps.staff.models import StaffRole
@@ -27,71 +30,86 @@ class Command(BaseCommand):
         # Define all roles and their permissions
         roles_data = {
             "DOCTOR": {
-                "name": "Doctor",
-                "permissions": {
-                    "patient": ["view", "add", "change"],
-                    "patientaddress": ["view"],
-                    "patientallergy": ["view", "add", "change"],
-                    "patientchroniccondition": ["view", "add", "change"],
-                    "patientdemographics": ["view", "add", "change"],
-                    "patientemergencycontact": ["view"],
-                    "patientmedicalreport": ["view", "add", "change"],
-                    "patientvisit": ["view", "add", "change"],
-                },
+            "name": "Doctor",
+            "permissions": {
+                "patient": ["view", "add", "change"],
+                "patientaddress": ["view"],
+                "patientallergy": ["view", "add", "change"],
+                "patientappointment": ["view", "add", "change"],
+                "patientchroniccondition": ["view", "add", "change"],
+                "patientdemographics": ["view", "add", "change"],
+                "patientdiagnosis": ["view", "add", "change"],
+                "patientemergencycontact": ["view"],
+                "patientmedicalreport": ["view", "add", "change"],
+                "patientoperation": ["view", "add", "change"],
+                "patientvisit": ["view", "add", "change"],
             },
-            "HEAD_DOCTOR": {
-                "name": "Head Doctor",
-                "permissions": {
-                    "patient": ["view", "add", "change", "delete"],
-                    "patientaddress": ["view", "add", "change", "delete"],
-                    "patientallergy": ["view", "add", "change", "delete"],
-                    "patientchroniccondition": ["view", "add", "change", "delete"],
-                    "patientdemographics": ["view", "add", "change", "delete"],
-                    "patientemergencycontact": ["view", "add", "change", "delete"],
-                    "patientmedicalreport": ["view", "add", "change", "delete"],
-                    "patientvisit": ["view", "add", "change"],
-                },
+        },
+        "HEAD_DOCTOR": {
+            "name": "Head Doctor",
+            "permissions": {
+                "patient": ["view", "add", "change", "delete"],
+                "patientaddress": ["view", "add", "change", "delete"],
+                "patientallergy": ["view", "add", "change", "delete"],
+                "patientappointment": ["view", "add", "change", "delete"],
+                "patientchroniccondition": ["view", "add", "change", "delete"],
+                "patientdemographics": ["view", "add", "change", "delete"],
+                "patientdiagnosis": ["view", "add", "change", "delete"],
+                "patientemergencycontact": ["view", "add", "change", "delete"],
+                "patientmedicalreport": ["view", "add", "change", "delete"],
+                "patientoperation": ["view", "add", "change", "delete"],
+                "patientvisit": ["view", "add", "change", "delete"],
             },
-            "NURSE": {
-                "name": "Nurse",
-                "permissions": {
-                    "patient": ["view"],
-                    "patientaddress": ["view"],
-                    "patientallergy": ["view", "add"],
-                    "patientchroniccondition": ["view"],
-                    "patientdemographics": ["view", "add"],
-                    "patientemergencycontact": ["view"],
-                    "patientmedicalreport": ["view"],
-                    "patientvisit": ["view", "add", "change"],
-                },
+        },
+        "NURSE": {
+            "name": "Nurse",
+            "permissions": {
+                "patient": ["view"],
+                "patientaddress": ["view"],
+                "patientallergy": ["view", "add"],
+                "patientappointment": ["view", "add"],
+                "patientchroniccondition": ["view"],
+                "patientdemographics": ["view", "add"],
+                "patientdiagnosis": ["view"],
+                "patientemergencycontact": ["view"],
+                "patientmedicalreport": ["view"],
+                "patientoperation": ["view"],
+                "patientvisit": ["view", "add", "change"],
             },
-            "LAB_TECHNICIAN": {
-                "name": "Lab Technician",
-                "permissions": {
-                    "patient": ["view"],
-                    "patientaddress": ["view"],
-                    "patientallergy": ["view"],
-                    "patientchroniccondition": ["view"],
-                    "patientdemographics": ["view"],
-                    "patientemergencycontact": ["view"],
-                    "patientmedicalreport": ["view", "add", "change"],
-                    "patientvisit": ["view", "add", "change"],
-                },
+        },
+        "LAB_TECHNICIAN": {
+            "name": "Lab Technician",
+            "permissions": {
+                "patient": ["view"],
+                "patientaddress": ["view"],
+                "patientallergy": ["view"],
+                "patientappointment": ["view"],
+                "patientchroniccondition": ["view"],
+                "patientdemographics": ["view"],
+                "patientdiagnosis": ["view"],
+                "patientemergencycontact": ["view"],
+                "patientmedicalreport": ["view", "add", "change"],
+                "patientoperation": ["view"],
+                "patientvisit": ["view", "add", "change"],
             },
-            "PHARMACIST": {
-                "name": "Pharmacist",
-                "permissions": {
-                    "patient": ["view"],
-                    "patientaddress": ["view"],
-                    "patientallergy": ["view"],
-                    "patientchroniccondition": ["view"],
-                    "patientdemographics": ["view"],
-                    "patientemergencycontact": ["view"],
-                    "patientmedicalreport": ["view"],
-                    "patientvisit": ["view", "add", "change"],
-                },
+        },
+        "PHARMACIST": {
+            "name": "Pharmacist",
+            "permissions": {
+                "patient": ["view"],
+                "patientaddress": ["view"],
+                "patientallergy": ["view"],
+                "patientappointment": ["view"],
+                "patientchroniccondition": ["view"],
+                "patientdemographics": ["view"],
+                "patientdiagnosis": ["view"],
+                "patientemergencycontact": ["view"],
+                "patientmedicalreport": ["view"],
+                "patientoperation": ["view"],
+                "patientvisit": ["view", "add", "change"],
             },
-        }
+        },
+    }
 
         try:
             # Fetch all tenant schemas
@@ -158,6 +176,15 @@ class Command(BaseCommand):
             ),
             "patientvisit": ContentType.objects.get_for_model(
                 PatientVisit
+            ),
+            "patientappointment": ContentType.objects.get_for_model(
+                PatientAppointment
+            ),
+            "patientdiagnosis": ContentType.objects.get_for_model(
+                PatientDiagnosis
+            ),
+            "patientoperation": ContentType.objects.get_for_model(
+                PatientOperation
             ),
         }
 

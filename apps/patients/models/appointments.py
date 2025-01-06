@@ -9,22 +9,51 @@ from .core import Patient
 class PatientAppointment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="appointments")
-    appointment_date = models.DateTimeField()
+    physician = models.ForeignKey(
+       "staff.StaffMember",
+        on_delete=models.CASCADE,
+        related_name="appointments",
+        limit_choices_to={"role__name": "Doctor"}
+    )
+    appointment_date = models.DateField()
+    appointment_time = models.TimeField()
+    duration_minutes = models.PositiveIntegerField(default=30)
     reason = models.CharField(max_length=255)
-    physician = models.CharField(max_length=100)
+    category = models.CharField(max_length=100)
     status = models.CharField(
-        max_length=50, choices=[("Pending", "Pending"), ("Completed", "Completed")]
+        max_length=50,
+        choices=[
+            ("Pending", "Pending"),
+            ("Confirmed", "Confirmed"),
+            ("Completed", "Completed"),
+            ("Rescheduled", "Rescheduled"),
+            ("Canceled", "Canceled"),
+        ]
     )
     notes = models.TextField(blank=True, null=True)
+    color_code = models.CharField(max_length=7, default="#FFFFFF")  # Hex color code
+    created_by = models.ForeignKey(
+        "staff.StaffMember", on_delete=models.SET_NULL, null=True, related_name="created_appointments"
+    )
+    modified_by = models.ForeignKey(
+        "staff.StaffMember", on_delete=models.SET_NULL, null=True, related_name="modified_appointments"
+    )
+    last_modified = models.DateTimeField(auto_now=True)
+    is_recurring = models.BooleanField(default=False)
+    recurrence_pattern = models.CharField(
+        max_length=50,
+        choices=[("Daily", "Daily"), ("Weekly", "Weekly"), ("Monthly", "Monthly")],
+        blank=True,
+        null=True
+    )
     history = HistoricalRecords(user_model="staff.StaffMember")
 
     class Meta:
-        db_table = "patient_appointments"  # Specify table name
+        db_table = "patient_appointments"
         indexes = [
-            models.Index(fields=["appointment_date", "physician"]),
+            models.Index(fields=["appointment_date", "appointment_time"]),
             models.Index(fields=["status", "appointment_date"]),
         ]
 
-
     def __str__(self):
-        return f"Appointment on {self.appointment_date} for {self.patient.first_name}"
+        return f"Appointment on {self.appointment_date} at {self.appointment_time} for {self.patient}"

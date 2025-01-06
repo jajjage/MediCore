@@ -1,16 +1,17 @@
 import uuid
-from django.db import connection, models
+
 from django.contrib.auth.models import (
     AbstractBaseUser,
     BaseUserManager,
     PermissionsMixin,
 )
+from django.db import connection, models
 
 
 class MyUserManager(BaseUserManager):
     def create_tenant_admin(self, email, hospital, password=None):
         """
-        Creates and saves a tenant admin user
+        Handle Creates and saves a tenant admin user.
         """
         if not email:
             raise ValueError("Users must have an email address")
@@ -26,7 +27,7 @@ class MyUserManager(BaseUserManager):
 
     def create_superuser(self, email, password=None):
         """
-        Creates and saves a superuser
+        Handle Creates and saves a superuser.
         """
         user = self.model(
             email=self.normalize_email(email), is_superuser=True, is_tenant_admin=True
@@ -77,9 +78,8 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
                 app_label = perm.split(".")[0]
                 return app_label in ["auth", "core", "tenants"]
             return False
-        else:
-            # In tenant schema, tenant admin has full permissions
-            return self.is_tenant_admin
+        # In tenant schema, tenant admin has full permissions
+        return self.is_tenant_admin
 
     def has_module_perms(self, app_label):
         if connection.schema_name == "public":
@@ -87,8 +87,7 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
                 # Only show shared apps in admin
                 return app_label in ["auth", "core", "tenants"]
             return False
-        else:
-            # In tenant schema, tenant admin can see all tenant apps
-            if self.is_tenant_admin:
-                return app_label not in ["auth", "core", "tenants"]
-            return False
+        # In tenant schema, tenant admin can see all tenant apps
+        if self.is_tenant_admin:
+            return app_label not in ["auth", "core", "tenants"]
+        return False

@@ -77,6 +77,25 @@ class StaffMemberAdmin(UserAdmin):
 
         return form
 
+    def save_model(self, request, obj, form, change):
+        """
+        Automatically set the hospital field to the current schema's hospital during save.
+        """
+        if not change:  # If creating a new instance
+            tenant_domain = get_tenant_domain_model().objects.get(
+                domain=request.get_host().split(":")[0]
+            )
+            with schema_context(tenant_domain.tenant.schema_name):
+                hospital = HospitalProfile.objects.get(
+                    tenant_id=tenant_domain.tenant.id
+                )
+            obj.hospital = hospital
+
+        # Ensure hospital is set correctly before saving
+        obj.save()
+
+        super().save_model(request, obj, form, change)
+
     def get_tenant(self, request):
         domain = get_tenant_domain_model().objects.get(
             domain=request.get_host().split(":")[0]

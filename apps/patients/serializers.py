@@ -298,47 +298,46 @@ class PatientDiagnosisSerializer(BasePatientSerializer):
         return data
 
 class PatientAppointmentSerializer(BasePatientSerializer):
-    """
-    Serializer for patient appointments with validation and history tracking.
-    """
+    patient_name = serializers.CharField(source="patient.name", read_only=True)
+    physician_name = serializers.CharField(source="physician.name", read_only=True)
 
     class Meta:
         model = PatientAppointment
         fields = [
             "id",
             "patient",
-            "appointment_date",
-            "reason",
+            "patient_name",
             "physician",
+            "physician_name",
+            "appointment_date",
+            "appointment_time",
+            "duration_minutes",
+            "reason",
+            "category",
             "status",
             "notes",
+            "color_code",
+            "is_recurring",
+            "recurrence_pattern"
         ]
-        read_only_fields = ["id"]
-
-    def validate_status(self, value):
-        """Validate appointment status."""
-        valid_statuses = dict(PatientAppointment._meta.get_field("status").choices)
-        if value not in valid_statuses:
-            raise serializers.ValidationError(
-                f"'{value}' is not a valid status. Use one of {list(valid_statuses.keys())}."
-            )
-        return value
+        read_only_fields = ["id", "created_by", "modified_by", "last_modified"]
 
     def validate(self, data):
-        """
-        Validate appointment data and permissions.
-        """
-        if self.instance:
-            if not self.check_permission("change", "patientappointment"):
-                raise serializers.ValidationError(
-                    {"error": "You don't have permission to update appointments"}
-                )
-        elif not self.check_permission("add", "patientappointment"):
+        if data.get("is_recurring") and not data.get("recurrence_pattern"):
             raise serializers.ValidationError(
-                {"error": "You don't have permission to add appointments"}
+                "Recurrence pattern is required for recurring appointments"
             )
-
         return data
+
+    def create(self, validated_data):
+        validated_data["created_by"] = self.context["request"].user
+        validated_data["modified_by"] = self.context["request"].user
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data["modified_by"] = self.context["request"].user
+        return super().update(instance, validated_data)
+
 class CompletePatientSerializer(
     BasePatientSerializer,
     PatientCalculationMixin,
