@@ -148,19 +148,23 @@ class RolePermission(BasePermission):
             raise ValueError(
                 f"No StaffRole found with code: normalize_role: {user_role}"
             ) from err
-
-        if permissions is None:
-            permissions_queryset = role.permissions.all()
+        permissions_queryset = role.permissions.all()
             # Convert to desired structure
-            permissions_dict = convert_queryset_to_role_permissions(
+        permissions_dict = convert_queryset_to_role_permissions(
                 permissions_queryset
             )
-            # Cache the permissions for 1 hour
-            cache.set(cache_key, permissions_dict, timeout=3600)
-            permissions = permissions_dict
+        # if permissions is None:
+        #     permissions_queryset = role.permissions.all()
+        #     # Convert to desired structure
+        #     permissions_dict = convert_queryset_to_role_permissions(
+        #         permissions_queryset
+        #     )
+        #     # Cache the permissions for 1 hour
+        #     cache.set(cache_key, permissions_dict, timeout=3600)
+        #     permissions = permissions_dict
 
         # Check if the user's role has the required permission
-        model_permissions = permissions.get(normalized_resource, [])
+        model_permissions = permissions_dict.get(normalized_resource, [])
         print(model_permissions)
         if not model_permissions:
             allowed_permissions = ROLE_PERMISSIONS.get(user_role, {}).get(

@@ -1,3 +1,4 @@
+from django.utils.timezone import now
 from rest_framework import serializers
 
 
@@ -49,5 +50,21 @@ def check_model_permissions(serializer, data, is_update):
                 raise serializers.ValidationError(
                     {field_name: f"You don't have permission to add {model_name}"}
                 )
+
+    return data
+
+def prescription_preiod( data):
+    """
+    Perform custom validation.
+    """
+    # Ensure valid_until date is not earlier than issued_date
+    if data.get("valid_until") and data["valid_until"] < now().date():
+        raise serializers.ValidationError(
+            {"valid_until": "The validity date cannot be in the past."}
+        )
+
+    # Ensure medicines field is not empty
+    if not data.get("medicines"):
+        raise serializers.ValidationError({"medicines": "This field is required."})
 
     return data

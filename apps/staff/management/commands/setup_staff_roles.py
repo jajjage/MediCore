@@ -15,6 +15,7 @@ from apps.patients.models import (
     PatientEmergencyContact,
     PatientMedicalReport,
     PatientOperation,
+    PatientPrescription,
     PatientVisit,
 )
 from apps.staff.models import StaffRole
@@ -43,6 +44,7 @@ class Command(BaseCommand):
                 "patientmedicalreport": ["view", "add", "change"],
                 "patientoperation": ["view", "add", "change"],
                 "patientvisit": ["view", "add", "change"],
+                "patientprescription": ["view", "add", "change"],
             },
         },
         "HEAD_DOCTOR": {
@@ -59,6 +61,7 @@ class Command(BaseCommand):
                 "patientmedicalreport": ["view", "add", "change", "delete"],
                 "patientoperation": ["view", "add", "change", "delete"],
                 "patientvisit": ["view", "add", "change", "delete"],
+                "patientprescription": ["view", "add", "change"],
             },
         },
         "NURSE": {
@@ -185,6 +188,9 @@ class Command(BaseCommand):
             ),
             "patientoperation": ContentType.objects.get_for_model(
                 PatientOperation
+            ),
+            "patientprescription": ContentType.objects.get_for_model(
+                PatientPrescription
             ),
         }
 

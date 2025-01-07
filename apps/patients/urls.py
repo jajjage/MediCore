@@ -13,6 +13,7 @@ from .views import (
     PatientOperationViewSet,
     PatientViewSet,
     PatientVisitViewSet,
+    PrescriptionViewSet,
 )
 
 # Parent router for patients
@@ -68,6 +69,11 @@ diagnosis_router = routers.NestedSimpleRouter(router, r"patients", lookup="patie
 diagnosis_router.register(
     r"diagnosis", PatientDiagnosisViewSet, basename="patient-diagnosis"
 )
+prescription_router = routers.NestedSimpleRouter(router, r"patients", lookup="patient")
+prescription_router.register(
+    r"prescriptions", PrescriptionViewSet, basename="patient-prescription"
+)
+
 
 
 urlpatterns = [
@@ -81,4 +87,5 @@ urlpatterns = [
     path("", include(operarion_router.urls)),
     path("", include(appointment_router.urls)),
     path("", include(diagnosis_router.urls)),
+    path("", include(prescription_router.urls)),
 ]

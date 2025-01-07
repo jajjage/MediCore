@@ -8,7 +8,7 @@ from .mixins.patients_mixins import (
     PatientRelatedOperationsMixin,
     PatientUpdateMixin,
 )
-from .model_perm import check_model_permissions
+from .model_perm import check_model_permissions, prescription_preiod
 from .models import (
     Patient,
     PatientAddress,
@@ -20,6 +20,7 @@ from .models import (
     PatientEmergencyContact,
     PatientMedicalReport,
     PatientOperation,
+    PatientPrescription,
     PatientVisit,
 )
 from .permissions import PermissionCheckedSerializerMixin
@@ -174,6 +175,44 @@ class PatientMedicalReportSerializer(BasePatientSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
+class PrescriptionSerializer(BasePatientSerializer, PatientCalculationMixin):
+    physician_full_name = serializers.SerializerMethodField()
+    class Meta:
+        model = PatientPrescription
+        fields = [
+            "id",
+            "appointment",
+            "physician_full_name",
+            "medicines",
+            "instructions",
+            "issued_date",
+            "valid_until",
+        ]
+        read_only_fields = ["id", "issued_date", "issued_by", "appointment"]
+
+    def validate(self, data):
+        """
+        Perform custom validation.
+        """
+        # Ensure valid_until date is not earlier than issued_date
+        data = prescription_preiod(data)
+
+        return data
+
+    def validate_appointment(self, value):
+        """
+        Ensure the appointment has no existing prescription.
+        """
+        if value.prescription.exists():
+            raise serializers.ValidationError(
+                "A prescription already exists for this appointment."
+            )
+        return value
+
+    def get_physician_full_name(self, obj):
+        return self.physician_format_full_name(obj.issued_by.first_name, obj.issued_by.last_name)
+
+
 class PatientVisitSerializer(BasePatientSerializer):
     """
     Serializer for patient visits with validation and history tracking.
@@ -297,18 +336,16 @@ class PatientDiagnosisSerializer(BasePatientSerializer):
 
         return data
 
-class PatientAppointmentSerializer(BasePatientSerializer):
-    patient_name = serializers.CharField(source="patient.name", read_only=True)
-    physician_name = serializers.CharField(source="physician.name", read_only=True)
+class PatientAppointmentSerializer(BasePatientSerializer, PatientCalculationMixin):
+    physician_full_name = serializers.SerializerMethodField()
+    patient_full_name = serializers.SerializerMethodField()
 
     class Meta:
         model = PatientAppointment
         fields = [
             "id",
-            "patient",
-            "patient_name",
-            "physician",
-            "physician_name",
+            "patient_full_name",
+            "physician_full_name",
             "appointment_date",
             "appointment_time",
             "duration_minutes",
@@ -320,7 +357,7 @@ class PatientAppointmentSerializer(BasePatientSerializer):
             "is_recurring",
             "recurrence_pattern"
         ]
-        read_only_fields = ["id", "created_by", "modified_by", "last_modified"]
+        read_only_fields = ["id", "created_by", "modified_by", "last_modified", "patient", "physician"]
 
     def validate(self, data):
         if data.get("is_recurring") and not data.get("recurrence_pattern"):
@@ -329,13 +366,23 @@ class PatientAppointmentSerializer(BasePatientSerializer):
             )
         return data
 
+    def get_physician_full_name(self, obj):
+        return self.physician_format_full_name(obj.physician.first_name, obj.physician.last_name)
+
+    def get_patient_full_name(self, obj):
+        return self.format_full_name(obj.patient.first_name, obj.patient.middle_name, obj.patient.last_name)
+
+    @transaction.atomic
     def create(self, validated_data):
         validated_data["created_by"] = self.context["request"].user
         validated_data["modified_by"] = self.context["request"].user
+        validated_data["physician"] = self.context["request"].user
+
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
         validated_data["modified_by"] = self.context["request"].user
+        validated_data["physician"] = self.context["request"].user
         return super().update(instance, validated_data)
 
 class CompletePatientSerializer(

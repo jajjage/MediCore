@@ -34,6 +34,11 @@ class PatientCalculationMixin:
             return f"{first_name} {middle_name} {last_name}".strip()
         return f"{first_name} {last_name}".strip()
 
+    def physician_format_full_name(self, first_name, last_name):
+        """Generate full name with optional middle name."""
+        return f"{first_name} {last_name}".strip()
+
+
 
 class PatientRelatedOperationsMixin:
     """Mixin for handling related model operations."""
