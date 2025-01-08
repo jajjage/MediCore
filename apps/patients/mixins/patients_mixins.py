@@ -1,9 +1,13 @@
-from django.utils.timezone import now
+from datetime import datetime
+
+from django.utils import timezone
+from rest_framework import serializers
 
 from apps.patients.models import (
     PatientAddress,
-    PatientAllergy,
-    PatientChronicCondition,
+    PatientAllergies,
+    PatientAppointment,
+    PatientChronicConditions,
     PatientDemographics,
     PatientEmergencyContact,
 )
@@ -21,7 +25,7 @@ class PatientCalculationMixin:
 
     def calculate_age(self, date_of_birth):
         """Calculate age from date of birth."""
-        today = now().date()
+        today = timezone.now().date()
         return (
             today.year
             - date_of_birth.year
@@ -84,8 +88,8 @@ class PatientRelatedOperationsMixin:
 
         # Handle lists of related objects
         related_lists = {
-            "allergies": PatientAllergy,
-            "chronic_conditions": PatientChronicCondition,
+            "allergies": PatientAllergies,
+            "chronic_conditions": PatientChronicConditions,
             "addresses": PatientAddress,
         }
 
@@ -125,12 +129,12 @@ class PatientCreateMixin:
     def _create_allergies(self, patient, allergies_data):
         if self.check_permission("add", "patientallergy"):
             for allergy_data in allergies_data:
-                PatientAllergy.objects.create(patient=patient, **allergy_data)
+                PatientAllergies.objects.create(patient=patient, **allergy_data)
 
     def _create_chronic_conditions(self, patient, chronic_conditions_data):
         if self.check_permission("add", "patientchroniccondition"):
             for condition_data in chronic_conditions_data:
-                PatientChronicCondition.objects.create(
+                PatientChronicConditions.objects.create(
                     patient=patient, **condition_data
                 )
 
@@ -162,7 +166,7 @@ class PatientUpdateMixin:
         ):
             instance.allergies.all().delete()
             for allergy_data in allergies_data:
-                PatientAllergy.objects.create(patient=instance, **allergy_data)
+                PatientAllergies.objects.create(patient=instance, **allergy_data)
 
     def _update_chronic_conditions(self, instance, chronic_conditions_data):
         if chronic_conditions_data is not None and self.check_permission(
@@ -170,7 +174,7 @@ class PatientUpdateMixin:
         ):
             instance.chronic_conditions.all().delete()
             for condition_data in chronic_conditions_data:
-                PatientChronicCondition.objects.create(
+                PatientChronicConditions.objects.create(
                     patient=instance, **condition_data
                 )
 
@@ -181,3 +185,94 @@ class PatientUpdateMixin:
             instance.addresses.all().delete()
             for address_data in addresses_data:
                 PatientAddress.objects.create(patient=instance, **address_data)
+
+
+class AppointmentValidator:
+    @staticmethod
+    def validate_appointment_datetime(appointment_date, appointment_time, instance=None):  # noqa: ARG004
+        """
+        Validate appointment date and time with proper timezone handling.
+        """
+        if appointment_date and appointment_time:
+            # Combine date and time
+            appointment_datetime = datetime.combine(appointment_date, appointment_time)
+
+            # Make the appointment datetime timezone-aware using the current timezone
+            appointment_datetime = timezone.make_aware(appointment_datetime)
+
+            # Get current time (already timezone-aware)
+            current_datetime = timezone.now()
+
+            if appointment_datetime < current_datetime:
+                raise serializers.ValidationError(
+                    "Appointment cannot be scheduled in the past"
+                )
+
+    @staticmethod
+    def validate_time_slot(appointment_date, appointment_time, physician, instance=None):
+        """
+        Check for appointment time slot conflicts.
+        """
+        conflicts = PatientAppointment.objects.filter(
+            physician=physician,
+            appointment_date=appointment_date,
+            appointment_time=appointment_time
+        )
+
+        if instance:
+            conflicts = conflicts.exclude(pk=instance.pk)
+
+        if conflicts.exists():
+            raise serializers.ValidationError(
+                "This time slot is already booked"
+            )
+
+    @staticmethod
+    def validate_recurrence(is_recurring, recurrence_pattern):
+        """
+        Validate recurring appointment data.
+        """
+        if is_recurring and not recurrence_pattern:
+            raise serializers.ValidationError(
+                "Recurrence pattern is required for recurring appointments"
+            )
+
+class OperationValidator:
+    @staticmethod
+    def validate_operation_datetime(operation_date, appointment_time, instance=None):  # noqa: ARG004
+        """
+        Validate appointment date and time with proper timezone handling.
+        """
+        if operation_date and appointment_time:
+            # Combine date and time
+            operation_datetime = datetime.combine(operation_date, appointment_time)
+
+            # Make the appointment datetime timezone-aware using the current timezone
+            operation_datetime = timezone.make_aware(operation_datetime)
+
+            # Get current time (already timezone-aware)
+            current_datetime = timezone.now()
+
+            if operation_datetime < current_datetime:
+                raise serializers.ValidationError(
+                    "Appointment cannot be scheduled in the past"
+                )
+
+    @staticmethod
+    def validate_time_slot(operation_date, operation_time, surgeon, instance=None):
+        """
+        Check for appointment time slot conflicts.
+        """
+        conflicts = PatientAppointment.objects.filter(
+            surgeon=surgeon,
+            operation_date=operation_date,
+            operation_time=operation_time
+        )
+
+        if instance:
+            conflicts = conflicts.exclude(pk=instance.pk)
+
+        if conflicts.exists():
+            raise serializers.ValidationError(
+                "This time slot is already booked"
+            )

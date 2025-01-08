@@ -7,6 +7,14 @@ from .core import Patient
 
 
 class PatientAppointment(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+        ("completed", "Completed"),
+        ("cancelled", "Cancelled"),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="appointments")
     physician = models.ForeignKey(
@@ -22,13 +30,7 @@ class PatientAppointment(models.Model):
     category = models.CharField(max_length=100)
     status = models.CharField(
         max_length=50,
-        choices=[
-            ("Pending", "Pending"),
-            ("Confirmed", "Confirmed"),
-            ("Completed", "Completed"),
-            ("Rescheduled", "Rescheduled"),
-            ("Canceled", "Canceled"),
-        ]
+        choices=STATUS_CHOICES, default="pending"
     )
     notes = models.TextField(blank=True, null=True)
     color_code = models.CharField(max_length=7, default="#FFFFFF")  # Hex color code

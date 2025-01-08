@@ -106,7 +106,6 @@ class RolePermission(BasePermission):
         user_role = str(raw_role).strip().upper().replace(" ", "_")
 
         # Check if role is in ROLE_PERMISSIONS
-        print(f"View basename: {view.basename}")
         print(f"View action: {view.action}")
         print(f"User role: {user_role}")
 
@@ -122,6 +121,7 @@ class RolePermission(BasePermission):
         resource_ = resource.replace("-", " ")
         normalized_resource = "".join(word for word in resource_.split())
         action = view.action
+        print(f"View basename: {normalized_resource}")
 
         # Map DRF actions to permissions
         action_to_permission = {
@@ -149,6 +149,7 @@ class RolePermission(BasePermission):
                 f"No StaffRole found with code: normalize_role: {user_role}"
             ) from err
         permissions_queryset = role.permissions.all()
+        # print(permissions_queryset)
             # Convert to desired structure
         permissions_dict = convert_queryset_to_role_permissions(
                 permissions_queryset

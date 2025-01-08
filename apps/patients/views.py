@@ -10,9 +10,9 @@ from rest_framework.viewsets import ModelViewSet
 from .models import (
     Patient,
     PatientAddress,
-    PatientAllergy,
+    PatientAllergies,
     PatientAppointment,
-    PatientChronicCondition,
+    PatientChronicConditions,
     PatientDemographics,
     PatientDiagnosis,
     PatientMedicalReport,
@@ -36,6 +36,7 @@ from .serializers import (
     PatientVisitSerializer,
     PrescriptionSerializer,
 )
+from .services import AppointmentService, OperationService
 
 
 class PatientViewSet(ModelViewSet):
@@ -213,7 +214,7 @@ class PatientAllergyViewSet(ModelViewSet):
     permission_classes = [RolePermission]
 
     def get_queryset(self):
-        return PatientAllergy.objects.filter(patient_id=self.kwargs.get("patient__pk"))
+        return PatientAllergies.objects.filter(patient_id=self.kwargs.get("patient__pk"))
 
     def perform_create(self, serializer):
         serializer.save(patient_id=self.kwargs.get("patient__pk"))
@@ -226,7 +227,7 @@ class PatientChronicConditionViewSet(ModelViewSet):
     permission_classes = [RolePermission]
 
     def get_queryset(self):
-        return PatientChronicCondition.objects.filter(
+        return PatientChronicConditions.objects.filter(
             patient_id=self.kwargs.get("patient__pk")
         )
 
@@ -284,13 +285,45 @@ class PatientOperationViewSet(ModelViewSet):
     serializer_class = PatientOperationSerializer
 
     def get_queryset(self):
-        return PatientOperation.objects.filter(patient_id=self.kwargs.get("patient__pk"))
+        return PatientOperation.objects.filter(
+            patient_id=self.kwargs.get("patient__pk")
+        )
 
     def perform_create(self, serializer):
+        OperationService.create_operation(
+            serializer,
+            self.request.user,
+            self.kwargs.get("patient__pk")
+        )
+
+    def perform_update(self, serializer):
+        OperationService.update_operation(
+            serializer,
+            self.request.user
+        )
+
+    @action(detail=True, methods=["patch"])
+    def reschedule(self, request, patient__pk=None, pk=None):
         """
-        Save the patient operation record.
+        Handle special endpoint for rescheduling appointments.
         """
-        serializer.save(patient_id=self.kwargs.get("patient__pk"))
+        operation = self.get_object()
+        serializer = self.get_serializer(
+            operation,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            OperationService.update_operation(
+                serializer,
+                self.request.user
+            )
+            return Response(serializer.data)
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 class PatientDiagnosisViewSet(ModelViewSet):
     """
@@ -310,21 +343,49 @@ class PatientDiagnosisViewSet(ModelViewSet):
         serializer.save(patient_id=self.kwargs.get("patient__pk"))
 
 class PatientAppointmentViewSet(ModelViewSet):
-    """
-    ViewSet for managing patient appointments.
-    """
-
     permission_classes = [RolePermission]
     serializer_class = PatientAppointmentSerializer
 
     def get_queryset(self):
-        return PatientAppointment.objects.filter(patient_id=self.kwargs.get("patient__pk"))
+        return PatientAppointment.objects.filter(
+            patient_id=self.kwargs.get("patient__pk")
+        )
 
     def perform_create(self, serializer):
+        AppointmentService.create_appointment(
+            serializer,
+            self.request.user,
+            self.kwargs.get("patient__pk")
+        )
+
+    def perform_update(self, serializer):
+        AppointmentService.update_appointment(
+            serializer,
+            self.request.user
+        )
+
+    @action(detail=True, methods=["patch"])
+    def reschedule(self, request, patient__pk=None, pk=None):
         """
-        Save the patient appointment record.
+        Handle special endpoint for rescheduling appointments.
         """
-        serializer.save(patient_id=self.kwargs.get("patient__pk"))
+        appointment = self.get_object()
+        serializer = self.get_serializer(
+            appointment,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            AppointmentService.update_appointment(
+                serializer,
+                self.request.user
+            )
+            return Response(serializer.data)
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 class PrescriptionViewSet(ModelViewSet):
     """

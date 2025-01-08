@@ -6,7 +6,7 @@ from simple_history.models import HistoricalRecords
 from .core import Patient
 
 
-class PatientAllergy(models.Model):
+class PatientAllergies(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     patient = models.ForeignKey(
         Patient, on_delete=models.CASCADE, related_name="allergies"
@@ -27,7 +27,7 @@ class PatientAllergy(models.Model):
             models.Index(fields=["severity"]),  # Index for filtering by severity
         ]
 
-class PatientChronicCondition(models.Model):
+class PatientChronicConditions(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     patient = models.ForeignKey(
         Patient, on_delete=models.CASCADE, related_name="chronic_conditions"

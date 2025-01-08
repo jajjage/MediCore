@@ -41,7 +41,7 @@ allergy_router.register(
 # Nested router for patient chronic conditions
 condition_router = routers.NestedSimpleRouter(router, r"patients", lookup="patient")
 condition_router.register(
-    r"conditions", PatientChronicConditionViewSet, basename="patient-conditions"
+    r"conditions", PatientChronicConditionViewSet, basename="patient-chronic-conditions"
 )
 
 # Nested router for patient medical reports

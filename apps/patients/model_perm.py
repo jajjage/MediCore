@@ -68,3 +68,4 @@ def prescription_preiod( data):
         raise serializers.ValidationError({"medicines": "This field is required."})
 
     return data
+
