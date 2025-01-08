@@ -20,10 +20,14 @@ def check_model_permissions(serializer, data, is_update):
         "patient": {"base": True},  # Base patient model
         "patientdemographics": {"field": "demographics"},
         "patientemergencycontact": {"field": "emergency_contact"},
-        "patientallergy": {"field": "allergies"},
-        "patientchroniccondition": {"field": "chronic_conditions"},
+        "patientallergies": {"field": "allergies"},
+        "patientchronicconditions": {"field": "chronic_conditions"},
         "patientaddress": {"field": "addresses"},
+        "patientoperation": {"field": "patient_operation"},
         "patientmedicalreport": {"field": "medical_reports"},
+        "patientvisit": {"field": "patient_visit"},
+        "patientdiagnosis": {"field": "patient_diagnosis"},
+        "patientappointment": {"field": "patient_appointment"},
     }
 
     # Check base patient permissions

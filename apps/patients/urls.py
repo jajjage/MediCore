@@ -55,8 +55,8 @@ visit_router.register(
     r"visits", PatientVisitViewSet, basename="patient-visit"
 )
 
-operarion_router = routers.NestedSimpleRouter(router, r"patients", lookup="patient")
-operarion_router.register(
+operation_router = routers.NestedSimpleRouter(router, r"patients", lookup="patient")
+operation_router.register(
     r"operations", PatientOperationViewSet, basename="patient-operation"
 )
 
@@ -84,7 +84,7 @@ urlpatterns = [
     path("", include(condition_router.urls)),
     path("", include(report_router.urls)),
     path("", include(visit_router.urls)),
-    path("", include(operarion_router.urls)),
+    path("", include(operation_router.urls)),
     path("", include(appointment_router.urls)),
     path("", include(diagnosis_router.urls)),
     path("", include(prescription_router.urls)),

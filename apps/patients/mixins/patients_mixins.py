@@ -10,6 +10,7 @@ from apps.patients.models import (
     PatientChronicConditions,
     PatientDemographics,
     PatientEmergencyContact,
+    PatientOperation,
 )
 
 
@@ -127,12 +128,12 @@ class PatientCreateMixin:
             )
 
     def _create_allergies(self, patient, allergies_data):
-        if self.check_permission("add", "patientallergy"):
+        if self.check_permission("add", "patientallergies"):
             for allergy_data in allergies_data:
                 PatientAllergies.objects.create(patient=patient, **allergy_data)
 
     def _create_chronic_conditions(self, patient, chronic_conditions_data):
-        if self.check_permission("add", "patientchroniccondition"):
+        if self.check_permission("add", "patientchronicconditions"):
             for condition_data in chronic_conditions_data:
                 PatientChronicConditions.objects.create(
                     patient=patient, **condition_data
@@ -239,13 +240,13 @@ class AppointmentValidator:
 
 class OperationValidator:
     @staticmethod
-    def validate_operation_datetime(operation_date, appointment_time, instance=None):  # noqa: ARG004
+    def validate_operation_datetime(operation_date, operation_time, instance=None):  # noqa: ARG004
         """
         Validate appointment date and time with proper timezone handling.
         """
-        if operation_date and appointment_time:
+        if operation_date and operation_time:
             # Combine date and time
-            operation_datetime = datetime.combine(operation_date, appointment_time)
+            operation_datetime = datetime.combine(operation_date, operation_time)
 
             # Make the appointment datetime timezone-aware using the current timezone
             operation_datetime = timezone.make_aware(operation_datetime)
@@ -253,17 +254,17 @@ class OperationValidator:
             # Get current time (already timezone-aware)
             current_datetime = timezone.now()
 
-            if operation_datetime < current_datetime:
+            if operation_datetime <= current_datetime:
                 raise serializers.ValidationError(
-                    "Appointment cannot be scheduled in the past"
+                    "Operation cannot be scheduled in the past"
                 )
 
     @staticmethod
     def validate_time_slot(operation_date, operation_time, surgeon, instance=None):
         """
-        Check for appointment time slot conflicts.
+        Check for operation time slot conflicts.
         """
-        conflicts = PatientAppointment.objects.filter(
+        conflicts = PatientOperation.objects.filter(
             surgeon=surgeon,
             operation_date=operation_date,
             operation_time=operation_time

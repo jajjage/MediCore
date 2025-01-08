@@ -44,3 +44,16 @@ def convert_queryset_to_role_permissions(
         permissions_dict[model] = sorted(set(permissions_dict[model]))
 
     return permissions_dict
+
+
+def normalize_permissions_dict(role_permissions):
+    """
+    Hn Normalizes the role permissions dictionary into a flattened format.
+
+    {resource_action: [roles]}
+    """
+    # Iterate through each role and its permissions
+    for role, role_data in role_permissions.items():
+        roel_ = role  # noqa: F841
+        return role_data
+    return {}

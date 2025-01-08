@@ -1,1 +1,1 @@
-DROP SCHEMA IF EXISTS downtownclinic_0a89fe9e CASCADE;
+DROP SCHEMA IF EXISTS peakhealthinstitute_a2c00817 CASCADE;

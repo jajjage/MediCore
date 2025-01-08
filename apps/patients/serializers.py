@@ -44,7 +44,7 @@ class BasePatientSerializer(
             for field_name in self.fields:
                 self.fields[field_name].read_only = True
 
-    def validate_future_date(self, value, field_name):
+    def validate_date_not_future(self, value, field_name):
         """Common validation for future dates."""  # noqa: D401
         if value and value > now().date():
             raise serializers.ValidationError(f"{field_name} cannot be in the future.")
@@ -281,20 +281,18 @@ class PatientOperationSerializer(BasePatientSerializer, PatientCalculationMixin)
             "patient_full_name",
             "surgeon_full_name",
             "operation_date",
-
+            "operation_time",
             "operation_name",
             "operation_code",
             "status",
             "notes",
         ]
-        read_only_fields = ["id", "surgeon", "patient", "modified_by"]
-
-    def validate_operation_date(self, value):
-        """Validate operation date is not in the future."""
-        return self.validate_date_not_future(value, "Operation date")
+        read_only_fields = ["id", "surgeon", "patient", "modified_by", "created_at", "updated_at"]
 
     def validate(self, data):
         """Validate operation data and permissions."""
+        is_update = self.instance is not None
+
         # Validate appointment datetime
         operation_date = data.get("operation_date",
                                  getattr(self.instance, "operation_date", None))
@@ -313,15 +311,8 @@ class PatientOperationSerializer(BasePatientSerializer, PatientCalculationMixin)
             self.context["request"].user,
             self.instance
         )
-        if self.instance:
-            if not self.check_permission("change", "patientoperation"):
-                raise serializers.ValidationError(
-                    {"error": "You don't have permission to update operations"}
-                )
-        elif not self.check_permission("add", "patientoperation"):
-            raise serializers.ValidationError(
-                {"error": "You don't have permission to add operations"}
-            )
+
+        data = check_model_permissions(self, data, is_update)
 
         return data
 

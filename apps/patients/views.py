@@ -284,6 +284,7 @@ class PatientOperationViewSet(ModelViewSet):
     permission_classes = [RolePermission]
     serializer_class = PatientOperationSerializer
 
+    print("operation view")
     def get_queryset(self):
         return PatientOperation.objects.filter(
             patient_id=self.kwargs.get("patient__pk")
@@ -303,7 +304,7 @@ class PatientOperationViewSet(ModelViewSet):
         )
 
     @action(detail=True, methods=["patch"])
-    def reschedule(self, request, patient__pk=None, pk=None):
+    def reschedule(self, request, patient_pk=None, pk=None):
         """
         Handle special endpoint for rescheduling appointments.
         """
