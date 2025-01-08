@@ -3,23 +3,26 @@ from django.utils.timezone import now
 from rest_framework import serializers
 
 from .mixins.patients_mixins import (
+    AppointmentValidator,
+    OperationValidator,
     PatientCalculationMixin,
     PatientCreateMixin,
     PatientRelatedOperationsMixin,
     PatientUpdateMixin,
 )
-from .model_perm import check_model_permissions
+from .model_perm import check_model_permissions, prescription_preiod
 from .models import (
     Patient,
     PatientAddress,
-    PatientAllergy,
+    PatientAllergies,
     PatientAppointment,
-    PatientChronicCondition,
+    PatientChronicConditions,
     PatientDemographics,
     PatientDiagnosis,
     PatientEmergencyContact,
     PatientMedicalReport,
     PatientOperation,
+    PatientPrescription,
     PatientVisit,
 )
 from .permissions import PermissionCheckedSerializerMixin
@@ -131,12 +134,12 @@ class PatientAllergySerializer(BasePatientSerializer):
     """Serializer for patient allergies."""
 
     class Meta:
-        model = PatientAllergy
+        model = PatientAllergies
         fields = ["id", "name", "severity", "reaction"]
         read_only_fields = ["id"]
 
     def validate_severity(self, value):
-        valid_severities = dict(PatientAllergy._meta.get_field("severity").choices)
+        valid_severities = dict(PatientAllergies._meta.get_field("severity").choices)
         if value not in valid_severities:
             raise serializers.ValidationError(
                 f"'{value}' is not a valid severity. Use one of {list(valid_severities.keys())}."
@@ -148,7 +151,7 @@ class PatientChronicConditionSerializer(BasePatientSerializer):
     """Serializer for patient chronic conditions."""
 
     class Meta:
-        model = PatientChronicCondition
+        model = PatientChronicConditions
         fields = ["id", "condition", "diagnosis_date", "notes"]
         read_only_fields = ["id"]
 
@@ -172,6 +175,44 @@ class PatientMedicalReportSerializer(BasePatientSerializer):
         model = PatientMedicalReport
         fields = ["id", "title", "description", "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class PrescriptionSerializer(BasePatientSerializer, PatientCalculationMixin):
+    physician_full_name = serializers.SerializerMethodField()
+    class Meta:
+        model = PatientPrescription
+        fields = [
+            "id",
+            "appointment",
+            "physician_full_name",
+            "medicines",
+            "instructions",
+            "issued_date",
+            "valid_until",
+        ]
+        read_only_fields = ["id", "issued_date", "issued_by", "appointment"]
+
+    def validate(self, data):
+        """
+        Perform custom validation.
+        """
+        # Ensure valid_until date is not earlier than issued_date
+        data = prescription_preiod(data)
+
+        return data
+
+    def validate_appointment(self, value):
+        """
+        Ensure the appointment has no existing prescription.
+        """
+        if value.prescription.exists():
+            raise serializers.ValidationError(
+                "A prescription already exists for this appointment."
+            )
+        return value
+
+    def get_physician_full_name(self, obj):
+        return self.physician_format_full_name(obj.issued_by.first_name, obj.issued_by.last_name)
 
 
 class PatientVisitSerializer(BasePatientSerializer):
@@ -226,23 +267,27 @@ class PatientVisitSerializer(BasePatientSerializer):
             return {}
         return super().to_representation(instance)
 
-class PatientOperationSerializer(BasePatientSerializer):
+class PatientOperationSerializer(BasePatientSerializer, PatientCalculationMixin):
     """
     Serializer for patient operations with validation and history tracking.
     """
 
+    surgeon_full_name = serializers.SerializerMethodField()
+    patient_full_name = serializers.SerializerMethodField()
     class Meta:
         model = PatientOperation
         fields = [
             "id",
-            "patient",
+            "patient_full_name",
+            "surgeon_full_name",
             "operation_date",
-            "surgeon",
+            "operation_time",
             "operation_name",
             "operation_code",
+            "status",
             "notes",
         ]
-        read_only_fields = ["id"]
+        read_only_fields = ["id", "surgeon", "patient", "modified_by"]
 
     def validate_operation_date(self, value):
         """Validate operation date is not in the future."""
@@ -250,6 +295,24 @@ class PatientOperationSerializer(BasePatientSerializer):
 
     def validate(self, data):
         """Validate operation data and permissions."""
+        # Validate appointment datetime
+        operation_date = data.get("operation_date",
+                                 getattr(self.instance, "operation_date", None))
+        operation_time = data.get("operation_time",
+                                 getattr(self.instance, "operation_time", None))
+
+        OperationValidator.validate_operation_datetime(
+            operation_date,
+            operation_time,
+            self.instance
+        )
+
+        OperationValidator.validate_time_slot(
+            operation_date,
+            operation_time,
+            self.context["request"].user,
+            self.instance
+        )
         if self.instance:
             if not self.check_permission("change", "patientoperation"):
                 raise serializers.ValidationError(
@@ -262,6 +325,18 @@ class PatientOperationSerializer(BasePatientSerializer):
 
         return data
 
+    def get_surgeon_full_name(self, obj):
+        return self.physician_format_full_name(
+            obj.surgeon.first_name,
+            obj.surgeon.last_name
+        )
+
+    def get_patient_full_name(self, obj):
+        return self.format_full_name(
+            obj.patient.first_name,
+            obj.patient.middle_name,
+            obj.patient.last_name
+        )
 class PatientDiagnosisSerializer(BasePatientSerializer):
     """
     Serializer for patient diagnoses with validation and history tracking.
@@ -297,18 +372,17 @@ class PatientDiagnosisSerializer(BasePatientSerializer):
 
         return data
 
-class PatientAppointmentSerializer(BasePatientSerializer):
-    patient_name = serializers.CharField(source="patient.name", read_only=True)
-    physician_name = serializers.CharField(source="physician.name", read_only=True)
+class PatientAppointmentSerializer(BasePatientSerializer, PatientCalculationMixin):
+    physician_full_name = serializers.SerializerMethodField()
+    patient_full_name = serializers.SerializerMethodField()
+    current_prescription = serializers.SerializerMethodField()
 
     class Meta:
         model = PatientAppointment
         fields = [
             "id",
-            "patient",
-            "patient_name",
-            "physician",
-            "physician_name",
+            "patient_full_name",
+            "physician_full_name",
             "appointment_date",
             "appointment_time",
             "duration_minutes",
@@ -318,25 +392,72 @@ class PatientAppointmentSerializer(BasePatientSerializer):
             "notes",
             "color_code",
             "is_recurring",
-            "recurrence_pattern"
+            "recurrence_pattern",
+            "current_prescription",
         ]
-        read_only_fields = ["id", "created_by", "modified_by", "last_modified"]
+        read_only_fields = [
+            "id",
+            "created_by",
+            "modified_by",
+            "last_modified",
+            "patient",
+            "physician",
+        ]
 
     def validate(self, data):
-        if data.get("is_recurring") and not data.get("recurrence_pattern"):
-            raise serializers.ValidationError(
-                "Recurrence pattern is required for recurring appointments"
-            )
+        # Validate recurring appointment settings
+        AppointmentValidator.validate_recurrence(
+            data.get("is_recurring"),
+            data.get("recurrence_pattern")
+        )
+
+        # Validate appointment datetime
+        appointment_date = data.get("appointment_date",
+                                 getattr(self.instance, "appointment_date", None))
+        appointment_time = data.get("appointment_time",
+                                 getattr(self.instance, "appointment_time", None))
+
+        AppointmentValidator.validate_appointment_datetime(
+            appointment_date,
+            appointment_time,
+            self.instance
+        )
+
+        # Validate time slot availability
+        AppointmentValidator.validate_time_slot(
+            appointment_date,
+            appointment_time,
+            self.context["request"].user,
+            self.instance
+        )
+
         return data
 
-    def create(self, validated_data):
-        validated_data["created_by"] = self.context["request"].user
-        validated_data["modified_by"] = self.context["request"].user
-        return super().create(validated_data)
+    def get_physician_full_name(self, obj):
+        return self.physician_format_full_name(
+            obj.physician.first_name,
+            obj.physician.last_name
+        )
 
-    def update(self, instance, validated_data):
-        validated_data["modified_by"] = self.context["request"].user
-        return super().update(instance, validated_data)
+    def get_patient_full_name(self, obj):
+        return self.format_full_name(
+            obj.patient.first_name,
+            obj.patient.middle_name,
+            obj.patient.last_name
+        )
+
+    def get_current_prescription(self, obj):
+        prescription = getattr(obj, "prescription", None)
+        if prescription:
+            return {
+                "id": prescription.id,
+                "medicines": prescription.medicines,
+                "instructions": prescription.instructions,
+                "issued_date": prescription.issued_date,
+                "valid_until": prescription.valid_until,
+            }
+        return None
+
 
 class CompletePatientSerializer(
     BasePatientSerializer,
