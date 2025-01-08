@@ -4,21 +4,23 @@ from .contact import PatientEmergencyContact
 from .core import Patient
 from .demographics import PatientDemographics
 from .diagnosis import PatientDiagnosis
-from .medical import PatientAllergy, PatientChronicCondition
+from .medical import PatientAllergies, PatientChronicConditions
 from .operations import PatientOperation
+from .prescriptions import PatientPrescription
 from .reports import PatientMedicalReport
 from .visits import PatientVisit
 
 __all__ = [
     "Patient",
     "PatientAddress",
-    "PatientAllergy",
+    "PatientAllergies",
     "PatientAppointment",
-    "PatientChronicCondition",
+    "PatientChronicConditions",
     "PatientDemographics",
     "PatientDiagnosis",
     "PatientEmergencyContact",
     "PatientMedicalReport",
     "PatientOperation",
+    "PatientPrescription",
     "PatientVisit",
 ]

@@ -1,7 +1,10 @@
 from django.core.cache import cache
 from rest_framework.permissions import BasePermission
 
-from apps.staff.helper import convert_queryset_to_role_permissions
+from apps.staff.helper import (
+    convert_queryset_to_role_permissions,
+    normalize_permissions_dict,
+)
 from apps.staff.models import StaffRole
 
 ROLE_PERMISSIONS = {
@@ -105,17 +108,11 @@ class RolePermission(BasePermission):
         # Extract role as string
         user_role = str(raw_role).strip().upper().replace(" ", "_")
 
-        # Check if role is in ROLE_PERMISSIONS
-        print(f"View basename: {view.basename}")
-        print(f"View action: {view.action}")
-        print(f"User role: {user_role}")
 
         if user_role not in ROLE_PERMISSIONS:
-            print(f"Role {user_role} not in ROLE_PERMISSIONS")
             return False
 
         if not hasattr(view, "basename") or not hasattr(view, "action"):
-            print("no action")
             return False
 
         resource = view.basename
@@ -148,7 +145,11 @@ class RolePermission(BasePermission):
             raise ValueError(
                 f"No StaffRole found with code: normalize_role: {user_role}"
             ) from err
-
+        permissions_queryset = role.permissions.all()
+            # Convert to desired structure
+        permissions_dict = convert_queryset_to_role_permissions(
+                permissions_queryset
+            )
         if permissions is None:
             permissions_queryset = role.permissions.all()
             # Convert to desired structure
@@ -160,8 +161,7 @@ class RolePermission(BasePermission):
             permissions = permissions_dict
 
         # Check if the user's role has the required permission
-        model_permissions = permissions.get(normalized_resource, [])
-        print(model_permissions)
+        model_permissions = permissions_dict.get(normalized_resource, [])
         if not model_permissions:
             allowed_permissions = ROLE_PERMISSIONS.get(user_role, {}).get(
                 "permissions", {}
@@ -180,9 +180,6 @@ class PermissionCheckedSerializerMixin:
         user_role = request.user.role
         normalize_role = str(user_role).strip().upper().replace(" ", "_")
 
-        # Debug prints
-        print(f"Checking permission for: {permission_type}_{model_name}")
-        print(f"User role: {normalize_role}")
 
         cache_key = f"user_role_permissions_{user_role}"
         permissions = cache.get(cache_key)
@@ -204,17 +201,12 @@ class PermissionCheckedSerializerMixin:
             cache.set(cache_key, permissions_dict, timeout=36)
             permissions = permissions_dict
 
-        # Debug print
-        print(f"Permissions dict: {permissions}")
-
         if hasattr(request.user, "user_permissions"):
             model_permissions = permissions.get(model_name, [])
-            print(f"Model permissions from DB: {model_permissions}")
         else:
             user_permissions = ROLE_PERMISSIONS.get(normalize_role, {})
-            model_permissions = user_permissions.get(model_name, [])
-            print(f"Model permissions from ROLE_PERMISSIONS: {model_permissions}")
+            permissions_dict = normalize_permissions_dict(user_permissions)
+            model_permissions = permissions_dict.get(model_name, [])
 
         result = permission_type in model_permissions
-        print(f"Permission check result: {result}")
         return result

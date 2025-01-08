@@ -59,6 +59,7 @@ class DynamicAuthModelMiddleware:
 class PublicSchemaMiddleware:
     """
     Middleware to ensure the public schema is used when accessing.
+
     routes not associated with a specific tenant.
     """
 

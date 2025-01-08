@@ -30,12 +30,12 @@ class Department(models.Model):
         "hospital.HospitalProfile", on_delete=models.CASCADE, null=True, blank=True
     )
 
-    def __str__(self):
-        return self.name
 
     class Meta:
         db_table = "department"
 
+    def __str__(self):
+        return self.name
 
 class StaffRole(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -98,12 +98,12 @@ class StaffMember(AbstractUser):
 
     def has_role(self, role_codes):
         """
-        Check if user has any of the specified role codes
+        Check if user has any of the specified role codes.
         """
         return self.role.code in role_codes
 
     def get_role_permissions(self):
         """
-        Get all permissions associated with the user's role
+        Get all permissions associated with the user's role.
         """
         return self.role.permissions.all()

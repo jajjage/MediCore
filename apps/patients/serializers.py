@@ -4,7 +4,6 @@ from rest_framework import serializers
 
 from .mixins.patients_mixins import (
     AppointmentValidator,
-    OperationValidator,
     PatientCalculationMixin,
     PatientCreateMixin,
     PatientRelatedOperationsMixin,
@@ -44,7 +43,7 @@ class BasePatientSerializer(
             for field_name in self.fields:
                 self.fields[field_name].read_only = True
 
-    def validate_future_date(self, value, field_name):
+    def validate_date_not_future(self, value, field_name):
         """Common validation for future dates."""  # noqa: D401
         if value and value > now().date():
             raise serializers.ValidationError(f"{field_name} cannot be in the future.")
@@ -287,7 +286,7 @@ class PatientOperationSerializer(BasePatientSerializer, PatientCalculationMixin)
             "status",
             "notes",
         ]
-        read_only_fields = ["id", "surgeon", "patient", "modified_by"]
+        read_only_fields = ["id"]
 
     def validate_operation_date(self, value):
         """Validate operation date is not in the future."""
@@ -295,24 +294,6 @@ class PatientOperationSerializer(BasePatientSerializer, PatientCalculationMixin)
 
     def validate(self, data):
         """Validate operation data and permissions."""
-        # Validate appointment datetime
-        operation_date = data.get("operation_date",
-                                 getattr(self.instance, "operation_date", None))
-        operation_time = data.get("operation_time",
-                                 getattr(self.instance, "operation_time", None))
-
-        OperationValidator.validate_operation_datetime(
-            operation_date,
-            operation_time,
-            self.instance
-        )
-
-        OperationValidator.validate_time_slot(
-            operation_date,
-            operation_time,
-            self.context["request"].user,
-            self.instance
-        )
         if self.instance:
             if not self.check_permission("change", "patientoperation"):
                 raise serializers.ValidationError(

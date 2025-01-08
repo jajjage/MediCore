@@ -7,14 +7,15 @@ from django_tenants.utils import schema_context, tenant_context
 from apps.patients.models import (
     Patient,
     PatientAddress,
-    PatientAllergy,
+    PatientAllergies,
     PatientAppointment,
-    PatientChronicCondition,
+    PatientChronicConditions,
     PatientDemographics,
     PatientDiagnosis,
     PatientEmergencyContact,
     PatientMedicalReport,
     PatientOperation,
+    PatientPrescription,
     PatientVisit,
 )
 from apps.staff.models import StaffRole
@@ -34,15 +35,16 @@ class Command(BaseCommand):
             "permissions": {
                 "patient": ["view", "add", "change"],
                 "patientaddress": ["view"],
-                "patientallergy": ["view", "add", "change"],
+                "patientallergies": ["view", "add", "change"],
                 "patientappointment": ["view", "add", "change"],
-                "patientchroniccondition": ["view", "add", "change"],
+                "patientchronicconditions": ["view", "add", "change"],
                 "patientdemographics": ["view", "add", "change"],
                 "patientdiagnosis": ["view", "add", "change"],
                 "patientemergencycontact": ["view"],
                 "patientmedicalreport": ["view", "add", "change"],
                 "patientoperation": ["view", "add", "change"],
                 "patientvisit": ["view", "add", "change"],
+                "patientprescription": ["view", "add", "change"],
             },
         },
         "HEAD_DOCTOR": {
@@ -50,15 +52,16 @@ class Command(BaseCommand):
             "permissions": {
                 "patient": ["view", "add", "change", "delete"],
                 "patientaddress": ["view", "add", "change", "delete"],
-                "patientallergy": ["view", "add", "change", "delete"],
+                "patientallergies": ["view", "add", "change", "delete"],
                 "patientappointment": ["view", "add", "change", "delete"],
-                "patientchroniccondition": ["view", "add", "change", "delete"],
+                "patientchronicconditions": ["view", "add", "change", "delete"],
                 "patientdemographics": ["view", "add", "change", "delete"],
                 "patientdiagnosis": ["view", "add", "change", "delete"],
                 "patientemergencycontact": ["view", "add", "change", "delete"],
                 "patientmedicalreport": ["view", "add", "change", "delete"],
                 "patientoperation": ["view", "add", "change", "delete"],
                 "patientvisit": ["view", "add", "change", "delete"],
+                "patientprescription": ["view", "add", "change"],
             },
         },
         "NURSE": {
@@ -66,9 +69,9 @@ class Command(BaseCommand):
             "permissions": {
                 "patient": ["view"],
                 "patientaddress": ["view"],
-                "patientallergy": ["view", "add"],
+                "patientallergies": ["view", "add"],
                 "patientappointment": ["view", "add"],
-                "patientchroniccondition": ["view"],
+                "patientchronicconditions": ["view"],
                 "patientdemographics": ["view", "add"],
                 "patientdiagnosis": ["view"],
                 "patientemergencycontact": ["view"],
@@ -82,9 +85,9 @@ class Command(BaseCommand):
             "permissions": {
                 "patient": ["view"],
                 "patientaddress": ["view"],
-                "patientallergy": ["view"],
+                "patientallergies": ["view"],
                 "patientappointment": ["view"],
-                "patientchroniccondition": ["view"],
+                "patientchronicconditions": ["view"],
                 "patientdemographics": ["view"],
                 "patientdiagnosis": ["view"],
                 "patientemergencycontact": ["view"],
@@ -98,9 +101,9 @@ class Command(BaseCommand):
             "permissions": {
                 "patient": ["view"],
                 "patientaddress": ["view"],
-                "patientallergy": ["view"],
+                "patientallergies": ["view"],
                 "patientappointment": ["view"],
-                "patientchroniccondition": ["view"],
+                "patientchronicconditions": ["view"],
                 "patientdemographics": ["view"],
                 "patientdiagnosis": ["view"],
                 "patientemergencycontact": ["view"],
@@ -167,9 +170,9 @@ class Command(BaseCommand):
             "patientemergencycontact": ContentType.objects.get_for_model(
                 PatientEmergencyContact
             ),
-            "patientallergy": ContentType.objects.get_for_model(PatientAllergy),
-            "patientchroniccondition": ContentType.objects.get_for_model(
-                PatientChronicCondition
+            "patientallergies": ContentType.objects.get_for_model(PatientAllergies),
+            "patientchronicconditions": ContentType.objects.get_for_model(
+                PatientChronicConditions
             ),
             "patientmedicalreport": ContentType.objects.get_for_model(
                 PatientMedicalReport
@@ -185,6 +188,9 @@ class Command(BaseCommand):
             ),
             "patientoperation": ContentType.objects.get_for_model(
                 PatientOperation
+            ),
+            "patientprescription": ContentType.objects.get_for_model(
+                PatientPrescription
             ),
         }
 

@@ -1,6 +1,7 @@
-from djoser.serializers import UserCreateSerializer, UserSerializer  # type: ignore
 from django.contrib.auth import get_user_model
+from djoser.serializers import UserCreateSerializer, UserSerializer
 from rest_framework import serializers
+
 from .models import Department, StaffMember, StaffRole
 
 User = get_user_model()

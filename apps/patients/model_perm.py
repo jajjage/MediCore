@@ -1,3 +1,4 @@
+from django.utils.timezone import now
 from rest_framework import serializers
 
 
@@ -19,10 +20,14 @@ def check_model_permissions(serializer, data, is_update):
         "patient": {"base": True},  # Base patient model
         "patientdemographics": {"field": "demographics"},
         "patientemergencycontact": {"field": "emergency_contact"},
-        "patientallergy": {"field": "allergies"},
-        "patientchroniccondition": {"field": "chronic_conditions"},
+        "patientallergies": {"field": "allergies"},
+        "patientchronicconditions": {"field": "chronic_conditions"},
         "patientaddress": {"field": "addresses"},
+        "patientoperation": {"field": "patient_operation"},
         "patientmedicalreport": {"field": "medical_reports"},
+        "patientvisit": {"field": "patient_visit"},
+        "patientdiagnosis": {"field": "patient_diagnosis"},
+        "patientappointment": {"field": "patient_appointment"},
     }
 
     # Check base patient permissions
@@ -51,3 +56,20 @@ def check_model_permissions(serializer, data, is_update):
                 )
 
     return data
+
+def prescription_preiod( data):
+    """
+    Perform custom validation.
+    """
+    # Ensure valid_until date is not earlier than issued_date
+    if data.get("valid_until") and data["valid_until"] < now().date():
+        raise serializers.ValidationError(
+            {"valid_until": "The validity date cannot be in the past."}
+        )
+
+    # Ensure medicines field is not empty
+    if not data.get("medicines"):
+        raise serializers.ValidationError({"medicines": "This field is required."})
+
+    return data
+
