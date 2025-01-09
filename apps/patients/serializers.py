@@ -223,15 +223,13 @@ class PatientVisitSerializer(BasePatientSerializer):
         model = PatientVisit
         fields = [
             "id",
-            "patient",
             "visit_date",
-            "physician",
             "ward_or_clinic",
             "discharge_date",
             "discharge_notes",
             "referred_by",
         ]
-        read_only_fields = ["id"]
+        read_only_fields = ["id", "patient",  "physician"]
 
     def validate(self, data):
         """
@@ -287,10 +285,6 @@ class PatientOperationSerializer(BasePatientSerializer, PatientCalculationMixin)
             "notes",
         ]
         read_only_fields = ["id"]
-
-    def validate_operation_date(self, value):
-        """Validate operation date is not in the future."""
-        return self.validate_date_not_future(value, "Operation date")
 
     def validate(self, data):
         """Validate operation data and permissions."""
