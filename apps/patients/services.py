@@ -11,7 +11,6 @@ class AppointmentService:
         return serializer.save(
             created_by=user,
             modified_by=user,
-            physician=user,
             patient_id=patient_id
         )
 
@@ -23,7 +22,6 @@ class AppointmentService:
         """
         return serializer.save(
             modified_by=user,
-            physician=user
         )
 
 class OperationService:

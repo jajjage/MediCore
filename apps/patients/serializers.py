@@ -2,6 +2,8 @@ from django.db import transaction
 from django.utils.timezone import now
 from rest_framework import serializers
 
+from apps.staff.models.department_member import DepartmentMember
+
 from .mixins.patients_mixins import (
     AppointmentValidator,
     PatientCalculationMixin,
@@ -347,17 +349,13 @@ class PatientDiagnosisSerializer(BasePatientSerializer):
 
         return data
 
-class PatientAppointmentSerializer(BasePatientSerializer, PatientCalculationMixin):
-    physician_full_name = serializers.SerializerMethodField()
-    patient_full_name = serializers.SerializerMethodField()
-    current_prescription = serializers.SerializerMethodField()
-
+class PatientAppointmentCreateSerializer(BasePatientSerializer, PatientCalculationMixin):
     class Meta:
         model = PatientAppointment
         fields = [
             "id",
-            "patient_full_name",
-            "physician_full_name",
+            "physician",
+            "department",
             "appointment_date",
             "appointment_time",
             "duration_minutes",
@@ -365,10 +363,10 @@ class PatientAppointmentSerializer(BasePatientSerializer, PatientCalculationMixi
             "category",
             "status",
             "notes",
-            "color_code",
+            "start_time",
+            "end_time",
             "is_recurring",
             "recurrence_pattern",
-            "current_prescription",
         ]
         read_only_fields = [
             "id",
@@ -376,11 +374,22 @@ class PatientAppointmentSerializer(BasePatientSerializer, PatientCalculationMixi
             "modified_by",
             "last_modified",
             "patient",
-            "physician",
         ]
 
     def validate(self, data):
         # Validate recurring appointment settings
+        department = data.get("department")
+        physician = data.get("physician")
+
+        if department and physician and not DepartmentMember.objects.filter(
+            department=department,
+            user=physician,
+            user__role__name="Doctor"
+        ).exists():
+                raise serializers.ValidationError({
+                    "physician": "Selected physician does not belong to the specified department."
+                })
+
         AppointmentValidator.validate_recurrence(
             data.get("is_recurring"),
             data.get("recurrence_pattern")
@@ -402,37 +411,11 @@ class PatientAppointmentSerializer(BasePatientSerializer, PatientCalculationMixi
         AppointmentValidator.validate_time_slot(
             appointment_date,
             appointment_time,
-            self.context["request"].user,
+            physician,
             self.instance
         )
 
         return data
-
-    def get_physician_full_name(self, obj):
-        return self.physician_format_full_name(
-            obj.physician.first_name,
-            obj.physician.last_name
-        )
-
-    def get_patient_full_name(self, obj):
-        return self.format_full_name(
-            obj.patient.first_name,
-            obj.patient.middle_name,
-            obj.patient.last_name
-        )
-
-    def get_current_prescription(self, obj):
-        prescription = getattr(obj, "prescription", None)
-        if prescription:
-            return {
-                "id": prescription.id,
-                "medicines": prescription.medicines,
-                "instructions": prescription.instructions,
-                "issued_date": prescription.issued_date,
-                "valid_until": prescription.valid_until,
-            }
-        return None
-
 
 class CompletePatientSerializer(
     BasePatientSerializer,
@@ -452,7 +435,7 @@ class CompletePatientSerializer(
     visits = PatientVisitSerializer(many=True, read_only=True)
     operations = PatientOperationSerializer(many=True, read_only=True)
     diagnoses = PatientDiagnosisSerializer(many=True, read_only=True)
-    appointments = PatientAppointmentSerializer(many=True, read_only=True)
+    appointments = PatientAppointmentCreateSerializer(many=True, read_only=True)
     full_name = serializers.SerializerMethodField()
     age = serializers.SerializerMethodField()
     pin = serializers.SerializerMethodField()
@@ -628,3 +611,76 @@ class PatientSearchSerializer(BasePatientSerializer, PatientCalculationMixin):
                 id=instance.id
             )
         return super().to_representation(instance)
+
+
+class PatientAppointmentSerializer(BasePatientSerializer, PatientCalculationMixin):
+    physician_full_name = serializers.SerializerMethodField()
+    patient_full_name = serializers.SerializerMethodField()
+    department_name = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    modified_by_name = serializers.SerializerMethodField()
+    current_prescription = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PatientAppointment
+        fields = [
+            "id",
+            "patient_full_name",
+            "physician_full_name",
+            "department_name",
+            "appointment_date",
+            "appointment_time",
+            "duration_minutes",
+            "reason",
+            "category",
+            "status",
+            "notes",
+            "start_time",
+            "end_time",
+            "is_recurring",
+            "recurrence_pattern",
+            "created_by",
+            "created_by_name",
+            "modified_by",
+            "modified_by_name",
+            "last_modified",
+            "current_prescription",
+        ]
+
+    def get_physician_full_name(self, obj):
+        return self.physician_format_full_name(
+            obj.physician.first_name,
+            obj.physician.last_name
+        )
+
+    def get_patient_full_name(self, obj):
+        return self.format_full_name(
+            obj.patient.first_name,
+            obj.patient.middle_name,
+            obj.patient.last_name
+        )
+
+    def get_department_name(self, obj):
+        return obj.department.name if obj.department else None
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}"
+        return None
+
+    def get_modified_by_name(self, obj):
+        if obj.modified_by:
+            return f"{obj.modified_by.first_name} {obj.modified_by.last_name}"
+        return None
+
+    def get_current_prescription(self, obj):
+        prescription = getattr(obj, "prescription", None)
+        if prescription:
+            return {
+                "id": prescription.id,
+                "medicines": prescription.medicines,
+                "instructions": prescription.instructions,
+                "issued_date": prescription.issued_date,
+                "valid_until": prescription.valid_until,
+            }
+        return None

@@ -19,9 +19,16 @@ class PatientAppointment(models.Model):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="appointments")
     physician = models.ForeignKey(
        "staff.StaffMember",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="appointments",
         limit_choices_to={"role__name": "Doctor"}
+    )
+    department = models.ForeignKey(
+        "staff.Department",
+        on_delete=models.PROTECT,
+        related_name="appointment_department",
+        limit_choices_to={"department_type": "CLINICAL"},
+        null=True
     )
     appointment_date = models.DateField()
     appointment_time = models.TimeField()
@@ -33,7 +40,6 @@ class PatientAppointment(models.Model):
         choices=STATUS_CHOICES, default="pending"
     )
     notes = models.TextField(blank=True, null=True)
-    color_code = models.CharField(max_length=7, default="#FFFFFF")  # Hex color code
     created_by = models.ForeignKey(
         "staff.StaffMember", on_delete=models.SET_NULL, null=True, related_name="created_appointments"
     )
@@ -48,6 +54,8 @@ class PatientAppointment(models.Model):
         blank=True,
         null=True
     )
+    start_time = models.DateTimeField(null=True)
+    end_time = models.DateTimeField(null=True)
     history = HistoricalRecords(user_model="staff.StaffMember")
 
     class Meta:
@@ -56,6 +64,14 @@ class PatientAppointment(models.Model):
             models.Index(fields=["appointment_date", "appointment_time"]),
             models.Index(fields=["status", "appointment_date"]),
         ]
+        constraints = [
+            models.CheckConstraint(check=models.Q(end_time__gt=models.F("start_time")), name="valid_time_range"),
+            models.UniqueConstraint(
+                fields=["physician", "start_time"],
+                name="unique_appointment_per_doctor_start_time"
+            ),
+        ]
+
 
     def __str__(self):
         return f"Appointment on {self.appointment_date} at {self.appointment_time} for {self.patient}"

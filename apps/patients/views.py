@@ -25,6 +25,7 @@ from .serializers import (
     CompletePatientSerializer,
     PatientAddressSerializer,
     PatientAllergySerializer,
+    PatientAppointmentCreateSerializer,
     PatientAppointmentSerializer,
     PatientChronicConditionSerializer,
     PatientDemographicsSerializer,
@@ -345,12 +346,22 @@ class PatientDiagnosisViewSet(ModelViewSet):
 
 class PatientAppointmentViewSet(ModelViewSet):
     permission_classes = [RolePermission]
-    serializer_class = PatientAppointmentSerializer
 
     def get_queryset(self):
+        patient_id = self.kwargs.get("patient__pk")
         return PatientAppointment.objects.filter(
-            patient_id=self.kwargs.get("patient__pk")
-        )
+            patient_id=patient_id
+        ).select_related(
+            "physician",
+            "department",
+            "patient",
+            "created_by",
+            "modified_by")
+
+    def get_serializer_class(self):
+        if self.action in ["create", "update", "partial_update"]:
+            return PatientAppointmentCreateSerializer
+        return PatientAppointmentSerializer
 
     def perform_create(self, serializer):
         AppointmentService.create_appointment(
@@ -365,29 +376,53 @@ class PatientAppointmentViewSet(ModelViewSet):
             self.request.user
         )
 
-    @action(detail=True, methods=["patch"])
+    @action(detail=True, methods=["patch", "get"])
     def reschedule(self, request, patient__pk=None, pk=None):
         """
-        Handle special endpoint for rescheduling appointments.
+        Handle appointment rescheduling for a specific patient.
+
+        Args:
+            request: The HTTP request object
+            patient__pk: Patient's primary key
+            pk: Appointment's primary key
+
+        Returns:
+            Response with updated appointment data or error messages
+
         """
-        appointment = self.get_object()
-        serializer = self.get_serializer(
-            appointment,
-            data=request.data,
-            partial=True
-        )
+        try:
+            appointment = self.get_object()
 
-        if serializer.is_valid():
-            AppointmentService.update_appointment(
-                serializer,
-                self.request.user
+            # Validate that appointment belongs to the specified patient
+            if str(appointment.patient.pk) != str(patient__pk):
+                return Response(
+                    {"error": "Appointment does not belong to specified patient"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            serializer = self.get_serializer(
+                appointment,
+                data=request.data,
+                partial=True
             )
-            return Response(serializer.data)
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
-        )
 
+            if serializer.is_valid():
+                AppointmentService.update_appointment(
+                    serializer,
+                    self.request.user
+                )
+                return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        except (ValidationError, NotFound) as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 class PrescriptionViewSet(ModelViewSet):
     """
     A viewset for managing Prescription instances with optimized querying.

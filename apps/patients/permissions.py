@@ -119,6 +119,8 @@ class RolePermission(BasePermission):
         resource_ = resource.replace("-", " ")
         normalized_resource = "".join(word for word in resource_.split())
         action = view.action
+        print(f"Action received: {action}")
+
 
         # Map DRF actions to permissions
         action_to_permission = {
@@ -130,12 +132,17 @@ class RolePermission(BasePermission):
             "destroy": "delete",
             "search": "view",
             # Add any custom actions here
-            "custom_action": "view",  # Example custom action
+            "cancel": "change",
+            "reschedule": "change",
+            "approve": "change",
+            "reject": "change",
         }
-
         permission = action_to_permission.get(action)
+        print(f"Resolved permission for action '{action}': {permission}")
+
         if not permission:
-             return False
+            print("false")
+            return False
         cache_key = f"user_role_permissions_{user_role}"
         # Check cache first
         permissions = cache.get(cache_key)

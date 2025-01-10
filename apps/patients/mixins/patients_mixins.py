@@ -220,6 +220,9 @@ class AppointmentValidator:
             appointment_time=appointment_time
         )
 
+        if physician.role.name != "Doctor":
+            raise serializers.ValidationError("Selected staff member is not a doctor.")
+
         if instance:
             conflicts = conflicts.exclude(pk=instance.pk)
 

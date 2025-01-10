@@ -1,6 +1,12 @@
-# from django.urls import include, path
+from django.urls import path
 
-# urlpatterns = [
-#     path('auth/', include('djoser.urls')),
-#     path('auth/', include('djoser.urls.jwt')),
-# ]
+from .views import ClinicalDepartmentListView, DepartmentDoctorsView
+
+urlpatterns = [
+    path("departments/",
+         ClinicalDepartmentListView.as_view(),
+         name="department"),
+    path("departments/members/<str:department_id>/doctors/",
+         DepartmentDoctorsView.as_view(),
+         name="departmentmember"),
+]

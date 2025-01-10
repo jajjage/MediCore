@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from djoser.serializers import UserCreateSerializer, UserSerializer
 from rest_framework import serializers
 
-from .models import Department, StaffMember, StaffRole
+from .models import Department, DepartmentMember, StaffMember, StaffRole
 
 User = get_user_model()
 
@@ -40,3 +40,19 @@ class StaffSerializer(UserSerializer):
         model = StaffMember
         fields = ("id", "email", "first_name", "last_name", "department", "role")
         read_only_fields = ("email",)
+
+
+class DepartmentListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Department
+        fields = ["id", "name", "department_type"]
+
+class DepartmentDoctorSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DepartmentMember
+        fields = ["id", "full_name", "department"]
+
+    def get_full_name(self, obj):
+        return f"{obj.user.first_name} {obj.user.last_name}"
