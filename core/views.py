@@ -1,6 +1,7 @@
 import logging
 
 from django.conf import settings
+from django.contrib.auth.models import update_last_login
 from django.core.cache import cache
 from jsonschema import ValidationError
 from rest_framework import status
@@ -15,49 +16,28 @@ from rest_framework_simplejwt.views import (
 
 logger = logging.getLogger(__name__)
 
-
-class CookieTokenMixin:
-    def set_auth_cookies(self, response, access_token=None, refresh_token=None):
-        if access_token:
-            response.set_cookie(
-                settings.JWT_AUTH_COOKIE,
-                access_token,
-                max_age=settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(),
-                secure=True,  # Force secure for production safety
-                httponly=True,
-                samesite="None",  # Allow cross-site requests
-                domain=settings.BASE_DOMAIN,
-                path="/",
-            )
-
-        if refresh_token:
-            response.set_cookie(
-                settings.JWT_AUTH_REFRESH_COOKIE,
-                refresh_token,
-                max_age=settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds(),
-                secure=True,
-                httponly=True,
-                samesite="None",
-                domain=settings.BASE_DOMAIN,
-                path="/",
-            )
-
-        return response
-
-
 class CookieTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         try:
             response = super().post(request, *args, **kwargs)
             if response.status_code == status.HTTP_200_OK:
-                logger.info("Token generation successful")
-                return self.set_token_cookies(response)
+                user = self.get_user(request)
+                if user:
+                    update_last_login(None, user)
+                    return self.set_token_cookies(response)
             return response  # noqa: TRY300
         except (TokenError, ValidationError) as e:
             logger.exception("Token generation failed: %s", e)
             return Response(
                 {"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED
             )
+    def get_user(self, request):
+        """
+        Retrieve the user object from the validated token or serializer data.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return serializer.user
 
     def _validate_token_data(self, data):
         if "access" not in data or "refresh" not in data:

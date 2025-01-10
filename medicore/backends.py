@@ -41,8 +41,9 @@ class MultiSchemaModelBackend(ModelBackend):
                 return None
         else:
             # Authenticate user IF schema is tenant
+            usermodel = get_user_model()
             try:
-                user = StaffMember.objects.get(email=username)
+                user = usermodel.objects.get(email=username)
                 if user.check_password(password):
                     return user
             except StaffMember.DoesNotExist:
