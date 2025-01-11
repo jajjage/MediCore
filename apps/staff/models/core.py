@@ -10,6 +10,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from .departments import Department
+from .staff_profile import DoctorProfile, NurseProfile, TechnicianProfile
 from .staff_role import StaffRole
 
 
@@ -134,3 +135,32 @@ class StaffMember(AbstractUser, PermissionsMixin):
         return self.department_memberships.filter(
             is_active=True
         ).values_list("role", flat=True).distinct()
+
+    @property
+    def staff_profile(self):
+        """
+        Returns the specific profile (doctor, nurse, etc.) based on role.
+        """
+        try:
+            if self.has_role(["DOCTOR"]):
+                return self.doctorprofile
+            if self.has_role(["NURSE"]):
+                return self.nurseprofile
+            if self.has_role(["TECHNICIAN"]):
+                return self.technicianprofile
+        except (DoctorProfile.DoesNotExist,
+                NurseProfile.DoesNotExist,
+                TechnicianProfile.DoesNotExist):
+            return None
+        return None
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Create corresponding profile if it doesn't exist
+        if self.role and not hasattr(self, "profile"):
+            if self.has_role(["DOCTOR"]):
+                DoctorProfile.objects.get_or_create(staff_member=self)
+            elif self.has_role(["NURSE"]):
+                NurseProfile.objects.get_or_create(staff_member=self)
+            elif self.has_role(["TECHNICIAN"]):
+                TechnicianProfile.objects.get_or_create(staff_member=self)
