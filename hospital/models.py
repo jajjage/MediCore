@@ -46,7 +46,7 @@ class HospitalProfile(models.Model):
 
     def clean(self):
         # Add validation
-        if self.tenant_id and self.pk is None:  # New hospital
+        if self.tenant_id and self.pk is None:  # New hospital  # noqa: SIM102
             if Client.objects.filter(schema_name=self.tenant.schema_name).exists():
                 raise ValidationError(
                     {"tenant": "A tenant with this schema name already exists."}

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
+
 from .models import MyUser
 
 
@@ -46,6 +46,13 @@ class CustomUserAdmin(admin.ModelAdmin):  # Changed from UserAdmin to admin.Mode
         "groups",
         "user_permissions",
     )  # These will now work with PermissionsMixin
+
+
+    def save_model(self, request, obj, form, change):
+        if form.cleaned_data.get("password"):
+            obj.set_password(form.cleaned_data["password"])
+
+        super().save_model(request, obj, form, change)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

@@ -3,8 +3,10 @@ import uuid
 
 from django.apps import apps
 from django.conf import settings
+from django.core.cache import cache
 from django.db import connection, transaction
 
+from core.models import TenantPermission
 from tenants.models import Client, Domain
 
 from .models import HospitalProfile
@@ -42,20 +44,32 @@ def generate_schema_name(hospital_name: str, max_length: int = 63) -> str:
 
     return schema_name
 
-
 class TenantCreationService:
     @staticmethod
     def get_user_model():
+        """Get the appropriate user model based on schema."""
         if connection.schema_name == "public":
             return apps.get_model("core", "MyUser")
         return apps.get_model("staff", "StaffMember")
 
     @staticmethod
+    def setup_initial_permissions(tenant, admin_user):
+        """ASetup initial permissions for the tenant admin."""
+        # Create admin permission for the tenant
+        TenantPermission.objects.create(
+            user=admin_user,
+            schema_name=tenant.schema_name,
+            permission_type="ADMIN"
+        )
+
+        # Invalidate any existing permission cache for this user
+        cache_key = f"tenant_access_{admin_user.id}_{tenant.schema_name}"
+        cache.delete(cache_key)
+
+    @staticmethod
     @transaction.atomic
     def create_tenant(validated_data):
-        User = TenantCreationService.get_user_model()  # noqa: N806
-
-        # Log the selected User model for debugging
+        user_model = TenantCreationService.get_user_model()
 
         # Create tenant
         tenant = Client.objects.create(
@@ -63,6 +77,7 @@ class TenantCreationService:
             name=validated_data["tenant_name"],
             paid_until=validated_data["paid_until"],
             on_trial=validated_data.get("on_trial", True),
+            status="active"  # Set initial status
         )
 
         # Create domain
@@ -73,11 +88,14 @@ class TenantCreationService:
         Domain.objects.create(domain=domain_name, tenant=tenant, is_primary=True)
 
         # Create admin user
-        admin_user = User.objects.create_tenant_admin(
+        admin_user = user_model.objects.create_tenant_admin(
             email=validated_data["admin_email"],
             password=validated_data["admin_password"],
             hospital=tenant,
         )
+
+        # Setup initial permissions
+        TenantCreationService.setup_initial_permissions(tenant, admin_user)
 
         # Create hospital profile
         hospital_profile = HospitalProfile.objects.create(
@@ -94,3 +112,66 @@ class TenantCreationService:
         )
 
         return hospital_profile
+
+    @staticmethod
+    @transaction.atomic
+    def add_user_to_tenant(user, tenant, permission_type="VIEWER"):
+        """
+        Add a user to a tenant with specified permissions.
+
+        Args:
+            user: The user to add
+            tenant: The tenant to add the user to
+            permission_type: The type of permission to grant (ADMIN, STAFF, or VIEWER)
+
+        """
+        # Validate permission type
+        if permission_type not in ["ADMIN", "STAFF", "VIEWER"]:
+            raise ValueError("Invalid permission type")
+
+        # Create or update permission
+        TenantPermission.objects.update_or_create(
+            user=user,
+            schema_name=tenant.schema_name,
+            defaults={"permission_type": permission_type}
+        )
+
+        # Invalidate permission cache
+        cache_key = f"tenant_access_{user.id}_{tenant.schema_name}"
+        cache.delete(cache_key)
+
+    @staticmethod
+    @transaction.atomic
+    def remove_user_from_tenant(user, tenant):
+        """
+        Remove a user's access to a tenant.
+
+        Args:
+            user: The user to remove
+            tenant: The tenant to remove the user from
+
+        """
+        # Delete permission
+        TenantPermission.objects.filter(
+            user=user,
+            schema_name=tenant.schema_name
+        ).delete()
+
+        # Invalidate permission cache
+        cache_key = f"tenant_access_{user.id}_{tenant.schema_name}"
+        cache.delete(cache_key)
+
+    @staticmethod
+    def get_tenant_users(tenant, permission_type=None):
+        """
+        Get all users with access to a tenant, optionally filtered by permission type.
+
+        Args:
+            tenant: The tenant to get users for
+            permission_type: Optional permission type to filter by
+
+        """
+        query = TenantPermission.objects.filter(schema_name=tenant.schema_name)
+        if permission_type:
+            query = query.filter(permission_type=permission_type)
+        return query.select_related("user")

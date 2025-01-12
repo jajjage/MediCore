@@ -1,11 +1,14 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
+import logging
+
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
 from core.permissions import IsSuperuser
-from .services import TenantCreationService
+
 from .serializers import CreateTenantRequestSerializer, HospitalProfileSerializer
-import logging
+from .services import TenantCreationService
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +30,6 @@ class CreateTenantAPIView(APIView):
             hospital_profile = TenantCreationService.create_tenant(
                 serializer.validated_data
             )
-
             # Prepare response
             response_serializer = HospitalProfileSerializer(hospital_profile)
             return Response(
@@ -40,7 +42,7 @@ class CreateTenantAPIView(APIView):
             )
 
         except Exception as e:
-            logger.error(f"Tenant creation failed: {str(e)}", exc_info=True)
+            logger.error(f"Tenant creation failed: {e!s}", exc_info=True)  # noqa: G201
             return Response(
                 {
                     "status": "error",

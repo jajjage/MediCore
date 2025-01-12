@@ -1,0 +1,15 @@
+/* Hide all inline groups by default */
+.inline-group {
+  display: none;
+}
+
+/* Show inline group when made visible by JavaScript */
+.inline-group.visible {
+  display: block;
+}
+
+/* Style for disabled role select */
+select[disabled].role-select {
+  background-color: #f8f9fa;
+  cursor: not-allowed;
+}

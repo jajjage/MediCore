@@ -187,6 +187,8 @@ SIMPLE_JWT = {
     "AUTH_COOKIE_REFRESH": JWT_AUTH_REFRESH_COOKIE,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,
+    "USER_ID_CLAIM": "user_id",
+    "TOKEN_TYPE_CLAIM": "token_type",
 }
 # Tenant vs Public Schema User Model Configuration
 PUBLIC_SCHEMA_USER_MODEL = "core.MyUser"
@@ -236,6 +238,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = str(BASE_DIR / "staticfiles")
+STATICFILES_DIRS = [
+    str(BASE_DIR / "static"),
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

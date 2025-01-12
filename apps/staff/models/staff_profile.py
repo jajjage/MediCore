@@ -1,3 +1,4 @@
+# models/staff_profiles.py
 import uuid
 
 from django.db import models
@@ -7,11 +8,6 @@ class StaffProfile(models.Model):
     """Base model for all staff profiles."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    staff_member = models.OneToOneField(
-        "staff.StaffMember",
-        on_delete=models.CASCADE,
-        related_name="profile"
-    )
     qualification = models.CharField(max_length=255)
     years_of_experience = models.PositiveIntegerField()
     certification_number = models.CharField(max_length=100, blank=True)
@@ -23,6 +19,11 @@ class StaffProfile(models.Model):
 class DoctorProfile(StaffProfile):
     """Profile specific to doctors."""
 
+    staff_member = models.OneToOneField(
+        "StaffMember",
+        on_delete=models.CASCADE,
+        related_name="doctor_profile"
+    )
     specialization = models.CharField(max_length=100)
     license_number = models.CharField(max_length=50, unique=True)
     availability = models.JSONField(
@@ -39,14 +40,15 @@ class DoctorProfile(StaffProfile):
 
     class Meta:
         db_table = "doctor_profile"
-        indexes = [
-            models.Index(fields=["license_number"]),
-            models.Index(fields=["specialization"]),
-        ]
 
 class NurseProfile(StaffProfile):
     """Profile specific to nurses."""
 
+    staff_member = models.OneToOneField(
+        "StaffMember",
+        on_delete=models.CASCADE,
+        related_name="nurse_profile"
+    )
     nurse_license = models.CharField(max_length=50, unique=True)
     ward_specialty = models.CharField(max_length=100)
     shift_preferences = models.JSONField(
@@ -56,14 +58,15 @@ class NurseProfile(StaffProfile):
 
     class Meta:
         db_table = "nurse_profile"
-        indexes = [
-            models.Index(fields=["nurse_license"]),
-            models.Index(fields=["ward_specialty"]),
-        ]
 
 class TechnicianProfile(StaffProfile):
     """Profile specific to technicians."""
 
+    staff_member = models.OneToOneField(
+        "StaffMember",
+        on_delete=models.CASCADE,
+        related_name="technician_profile"
+    )
     technician_license = models.CharField(max_length=50, unique=True)
     equipment_specialties = models.JSONField(
         default=list,
@@ -76,6 +79,3 @@ class TechnicianProfile(StaffProfile):
 
     class Meta:
         db_table = "technician_profile"
-        indexes = [
-            models.Index(fields=["technician_license"]),
-        ]

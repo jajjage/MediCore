@@ -125,6 +125,9 @@ ignore = [
     "DJ008",    # "Avoid using `assert` in `try` block" 
     "DJ001",    # "Avoid using `assert` in `try` block"
     "T201",     # "Print i would activate it later {print}"
+    "G004",     #JKFJKF
+    "RET506",   #
+    "TRY300",   #
 ]
 
 [tool.ruff.lint.per-file-ignores]

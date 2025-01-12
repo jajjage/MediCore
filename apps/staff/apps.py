@@ -14,5 +14,5 @@ class StaffConfig(AppConfig):
 
         try:
             Command().handle()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error during role creation: {e}")

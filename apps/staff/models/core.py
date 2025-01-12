@@ -153,14 +153,3 @@ class StaffMember(AbstractUser, PermissionsMixin):
                 TechnicianProfile.DoesNotExist):
             return None
         return None
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        # Create corresponding profile if it doesn't exist
-        if self.role and not hasattr(self, "profile"):
-            if self.has_role(["DOCTOR"]):
-                DoctorProfile.objects.get_or_create(staff_member=self)
-            elif self.has_role(["NURSE"]):
-                NurseProfile.objects.get_or_create(staff_member=self)
-            elif self.has_role(["TECHNICIAN"]):
-                TechnicianProfile.objects.get_or_create(staff_member=self)

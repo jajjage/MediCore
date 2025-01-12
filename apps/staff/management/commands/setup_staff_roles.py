@@ -2,7 +2,6 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand
 from django.db import connection
-from django_tenants.utils import schema_context, tenant_context
 
 from apps.patients.models import (
     Patient,
@@ -19,137 +18,130 @@ from apps.patients.models import (
     PatientVisit,
 )
 from apps.staff.models import StaffRole
-from tenants.models import Client
 
 
 class Command(BaseCommand):
-    help = "Setup staff roles and their permissions"
+    help = "Setup staff roles and their permissions for the current schema"
 
     def handle(self, *args, **kwargs):
-        self.stdout.write("Starting staff roles setup...")
+        # Get the current schema from the connection
+        current_schema = connection.schema_name
+        self.stdout.write(f"Starting staff roles setup for current schema: {current_schema}")
 
         # Define all roles and their permissions
         roles_data = {
             "DOCTOR": {
-            "name": "Doctor",
-            "permissions": {
-                "patient": ["view", "add", "change"],
-                "patientaddress": ["view"],
-                "patientallergies": ["view", "add", "change"],
-                "patientappointment": ["view", "add", "change"],
-                "patientchronicconditions": ["view", "add", "change"],
-                "patientdemographics": ["view", "add", "change"],
-                "patientdiagnosis": ["view", "add", "change"],
-                "patientemergencycontact": ["view"],
-                "patientmedicalreport": ["view", "add", "change"],
-                "patientoperation": ["view", "add", "change"],
-                "patientvisit": ["view", "add", "change"],
-                "patientprescription": ["view", "add", "change"],
+                "name": "Doctor",
+                "permissions": {
+                    "patient": ["view", "add", "change"],
+                    "patientaddress": ["view"],
+                    "patientallergies": ["view", "add", "change"],
+                    "patientappointment": ["view", "add", "change"],
+                    "patientchronicconditions": ["view", "add", "change"],
+                    "patientdemographics": ["view", "add", "change"],
+                    "patientdiagnosis": ["view", "add", "change"],
+                    "patientemergencycontact": ["view"],
+                    "patientmedicalreport": ["view", "add", "change"],
+                    "patientoperation": ["view", "add", "change"],
+                    "patientvisit": ["view", "add", "change"],
+                    "patientprescription": ["view", "add", "change"],
+                },
             },
-        },
-        "HEAD_DOCTOR": {
-            "name": "Head Doctor",
-            "permissions": {
-                "patient": ["view", "add", "change", "delete"],
-                "patientaddress": ["view", "add", "change", "delete"],
-                "patientallergies": ["view", "add", "change", "delete"],
-                "patientappointment": ["view", "add", "change", "delete"],
-                "patientchronicconditions": ["view", "add", "change", "delete"],
-                "patientdemographics": ["view", "add", "change", "delete"],
-                "patientdiagnosis": ["view", "add", "change", "delete"],
-                "patientemergencycontact": ["view", "add", "change", "delete"],
-                "patientmedicalreport": ["view", "add", "change", "delete"],
-                "patientoperation": ["view", "add", "change", "delete"],
-                "patientvisit": ["view", "add", "change", "delete"],
-                "patientprescription": ["view", "add", "change"],
+            "HEAD_DOCTOR": {
+                "name": "Head Doctor",
+                "permissions": {
+                    "patient": ["view", "add", "change", "delete"],
+                    "patientaddress": ["view", "add", "change", "delete"],
+                    "patientallergies": ["view", "add", "change", "delete"],
+                    "patientappointment": ["view", "add", "change", "delete"],
+                    "patientchronicconditions": ["view", "add", "change", "delete"],
+                    "patientdemographics": ["view", "add", "change", "delete"],
+                    "patientdiagnosis": ["view", "add", "change", "delete"],
+                    "patientemergencycontact": ["view", "add", "change", "delete"],
+                    "patientmedicalreport": ["view", "add", "change", "delete"],
+                    "patientoperation": ["view", "add", "change", "delete"],
+                    "patientvisit": ["view", "add", "change", "delete"],
+                    "patientprescription": ["view", "add", "change"],
+                },
             },
-        },
-        "NURSE": {
-            "name": "Nurse",
-            "permissions": {
-                "patient": ["view"],
-                "patientaddress": ["view"],
-                "patientallergies": ["view", "add"],
-                "patientappointment": ["view", "add"],
-                "patientchronicconditions": ["view"],
-                "patientdemographics": ["view", "add"],
-                "patientdiagnosis": ["view"],
-                "patientemergencycontact": ["view"],
-                "patientmedicalreport": ["view"],
-                "patientoperation": ["view"],
-                "patientvisit": ["view", "add", "change"],
+            "NURSE": {
+                "name": "Nurse",
+                "permissions": {
+                    "patient": ["view"],
+                    "patientaddress": ["view"],
+                    "patientallergies": ["view", "add"],
+                    "patientappointment": ["view", "add"],
+                    "patientchronicconditions": ["view"],
+                    "patientdemographics": ["view", "add"],
+                    "patientdiagnosis": ["view"],
+                    "patientemergencycontact": ["view"],
+                    "patientmedicalreport": ["view"],
+                    "patientoperation": ["view"],
+                    "patientvisit": ["view", "add", "change"],
+                },
             },
-        },
-        "LAB_TECHNICIAN": {
-            "name": "Lab Technician",
-            "permissions": {
-                "patient": ["view"],
-                "patientaddress": ["view"],
-                "patientallergies": ["view"],
-                "patientappointment": ["view"],
-                "patientchronicconditions": ["view"],
-                "patientdemographics": ["view"],
-                "patientdiagnosis": ["view"],
-                "patientemergencycontact": ["view"],
-                "patientmedicalreport": ["view", "add", "change"],
-                "patientoperation": ["view"],
-                "patientvisit": ["view", "add", "change"],
+            "LAB_TECHNICIAN": {
+                "name": "Lab Technician",
+                "permissions": {
+                    "patient": ["view"],
+                    "patientaddress": ["view"],
+                    "patientallergies": ["view"],
+                    "patientappointment": ["view"],
+                    "patientchronicconditions": ["view"],
+                    "patientdemographics": ["view"],
+                    "patientdiagnosis": ["view"],
+                    "patientemergencycontact": ["view"],
+                    "patientmedicalreport": ["view", "add", "change"],
+                    "patientoperation": ["view"],
+                    "patientvisit": ["view", "add", "change"],
+                },
             },
-        },
-        "PHARMACIST": {
-            "name": "Pharmacist",
-            "permissions": {
-                "patient": ["view"],
-                "patientaddress": ["view"],
-                "patientallergies": ["view"],
-                "patientappointment": ["view"],
-                "patientchronicconditions": ["view"],
-                "patientdemographics": ["view"],
-                "patientdiagnosis": ["view"],
-                "patientemergencycontact": ["view"],
-                "patientmedicalreport": ["view"],
-                "patientoperation": ["view"],
-                "patientvisit": ["view", "add", "change"],
+            "PHARMACIST": {
+                "name": "Pharmacist",
+                "permissions": {
+                    "patient": ["view"],
+                    "patientaddress": ["view"],
+                    "patientallergies": ["view"],
+                    "patientappointment": ["view"],
+                    "patientchronicconditions": ["view"],
+                    "patientdemographics": ["view"],
+                    "patientdiagnosis": ["view"],
+                    "patientemergencycontact": ["view"],
+                    "patientmedicalreport": ["view"],
+                    "patientoperation": ["view"],
+                    "patientvisit": ["view", "add", "change"],
+                },
             },
-        },
-    }
+        }
 
         try:
-            # Fetch all tenant schemas
-            tenants = Client.objects.exclude(schema_name="public")
+            with connection.cursor() as cursor:
+                self.setup_roles(roles_data)
 
-            for tenant in tenants:
-                self.stdout.write(f"Processing tenant: {tenant.schema_name}")
-
-                # Use tenant_context instead of manual search_path
-                with tenant_context(tenant), schema_context(
-                    tenant.schema_name
-                ), connection.cursor() as cursor:
-                    self.setup_roles(roles_data)
-                    cursor.execute("""
-                                CREATE SEQUENCE IF NOT EXISTS patient_pin_seq_middle
-                                START WITH 20
-                                INCREMENT BY 1
-                                MINVALUE 20
-                                MAXVALUE 99999
-                                CYCLE;
-                            """)
-                    # Second sequence for last part (1000-9999)
-                    cursor.execute("""
-                                CREATE SEQUENCE IF NOT EXISTS patient_pin_seq_last
-                                START WITH 40
-                                INCREMENT BY 1
-                                MINVALUE 40
-                                MAXVALUE 99999
-                                CYCLE;
-                            """)
-                    cursor.execute(
-                        "CREATE INDEX patient_pin_lower_idx ON patients (LOWER(pin));"
-                    )
+                # Create sequences
+                cursor.execute("""
+                    CREATE SEQUENCE IF NOT EXISTS patient_pin_seq_middle
+                    START WITH 20
+                    INCREMENT BY 1
+                    MINVALUE 20
+                    MAXVALUE 99999
+                    CYCLE;
+                """)
+                cursor.execute("""
+                    CREATE SEQUENCE IF NOT EXISTS patient_pin_seq_last
+                    START WITH 40
+                    INCREMENT BY 1
+                    MINVALUE 40
+                    MAXVALUE 99999
+                    CYCLE;
+                """)
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS patient_pin_lower_idx ON patients (LOWER(pin));"
+                )
 
             self.stdout.write(
                 self.style.SUCCESS(
-                    "Staff roles setup completed successfully for all tenants"
+                    f"Staff roles setup completed successfully for schema: {current_schema}"
                 )
             )
 
@@ -163,35 +155,17 @@ class Command(BaseCommand):
         # Get content types for our models
         model_content_types = {
             "patient": ContentType.objects.get_for_model(Patient),
-            "patientdemographics": ContentType.objects.get_for_model(
-                PatientDemographics
-            ),
+            "patientdemographics": ContentType.objects.get_for_model(PatientDemographics),
             "patientaddress": ContentType.objects.get_for_model(PatientAddress),
-            "patientemergencycontact": ContentType.objects.get_for_model(
-                PatientEmergencyContact
-            ),
+            "patientemergencycontact": ContentType.objects.get_for_model(PatientEmergencyContact),
             "patientallergies": ContentType.objects.get_for_model(PatientAllergies),
-            "patientchronicconditions": ContentType.objects.get_for_model(
-                PatientChronicConditions
-            ),
-            "patientmedicalreport": ContentType.objects.get_for_model(
-                PatientMedicalReport
-            ),
-            "patientvisit": ContentType.objects.get_for_model(
-                PatientVisit
-            ),
-            "patientappointment": ContentType.objects.get_for_model(
-                PatientAppointment
-            ),
-            "patientdiagnosis": ContentType.objects.get_for_model(
-                PatientDiagnosis
-            ),
-            "patientoperation": ContentType.objects.get_for_model(
-                PatientOperation
-            ),
-            "patientprescription": ContentType.objects.get_for_model(
-                PatientPrescription
-            ),
+            "patientchronicconditions": ContentType.objects.get_for_model(PatientChronicConditions),
+            "patientmedicalreport": ContentType.objects.get_for_model(PatientMedicalReport),
+            "patientvisit": ContentType.objects.get_for_model(PatientVisit),
+            "patientappointment": ContentType.objects.get_for_model(PatientAppointment),
+            "patientdiagnosis": ContentType.objects.get_for_model(PatientDiagnosis),
+            "patientoperation": ContentType.objects.get_for_model(PatientOperation),
+            "patientprescription": ContentType.objects.get_for_model(PatientPrescription),
         }
 
         for role_code, role_info in roles_data.items():
@@ -222,9 +196,7 @@ class Command(BaseCommand):
                             codename=codename, content_type=content_type
                         )
                         role.permissions.add(permission)
-                        self.stdout.write(
-                            f"Added permission: {codename} to {role.name}"
-                        )
+                        self.stdout.write(f"Added permission: {codename} to {role.name}")
                     except Permission.DoesNotExist:
                         self.stdout.write(
                             self.style.WARNING(f"Permission {codename} does not exist")

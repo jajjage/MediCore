@@ -24,6 +24,14 @@ class Client(TenantMixin):
     def __str__(self):
         return f"{self.name} ({self.schema_name})"
 
+    def get_users_with_access(self):
+        """Get all users who have access to this tenant."""
+        from core.models import MyUser
+        return MyUser.objects.filter(
+            models.Q(hospital=self) |
+            models.Q(tenant_permissions__schema_name=self.schema_name)
+        ).distinct()
+
 
 class Domain(DomainMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
