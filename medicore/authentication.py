@@ -78,9 +78,7 @@ class RobustCookieJWTAuthentication(JWTAuthentication):
                     cache_key = f"tenant_access_{user.id}_{schema_name}"
                     has_access = cache.get(cache_key)
                     if has_access is None:
-                        print(schema_name)
                         has_access = user.has_tenant_access(schema_name)
-                        print(has_access)
                         cache.set(cache_key, has_access, timeout=300)
 
                     if not has_access:

@@ -1,38 +1,12 @@
-# permissions.py
+from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from rest_framework.permissions import BasePermission
 from rest_framework.viewsets import ViewSet
 
-from .helper import convert_queryset_to_role_permissions
-from .models import StaffRole
 
-# Define permissions mapping for appointments
-APPOINTMENT_PERMISSIONS = {
-    "DOCTOR": {
-        "permissions": {
-            "department": ["view"],
-        }
-    },
-    "NURSE": {
-        "permissions": {
-            "department": ["view"],
-        }
-    },
-    "RECEPTIONIST": {
-        "permissions": {
-            "department": ["view"],
-        }
-    },
-    "ADMIN": {
-        "permissions": {
-            "department": ["view"],
-        }
-    }
-}
-
-class AppointmentRolePermission(BasePermission):
+class TenantModelPermission(BasePermission):
     """
-    Custom permission to check user roles and their permissions.
+    Custom permission to check user permissions based on tenant and model level.
 
     Handles both ViewSets and APIViews.
     """
@@ -43,82 +17,82 @@ class AppointmentRolePermission(BasePermission):
         """
         # Handle ViewSets
         if isinstance(view, ViewSet):
-            return view.action
+            # Map common viewset actions to permission types
+            action_to_permission = {
+                "list": "view",
+                "retrieve": "view",
+                "create": "add",
+                "update": "change",
+                "partial_update": "change",
+                "destroy": "delete"
+            }
+            return action_to_permission.get(view.action, view.action)
 
         # Handle regular APIViews
-        method_to_action = {
+        method_to_permission = {
             "GET": "view",
             "POST": "add",
             "PUT": "change",
             "PATCH": "change",
             "DELETE": "delete"
         }
-        return method_to_action.get(view.request.method, None)
+        return method_to_permission.get(view.request.method, None)
 
-    def get_resource_name(self, view):
+    def get_model_class(self, view):
         """
-        Get the resource name from view.
+        Extract the model class from the view.
         """
-        # For ViewSets
-        if hasattr(view, "basename"):
-            resource = view.basename
-        # For APIViews
-        elif hasattr(view, "name"):
-            resource = view.name
-        # Fallback to view name
-        else:
-            resource = view.__class__.__name__.replace("View", "").lower()
-
-        resource_ = resource.replace("-", " ")
-        return "".join(word for word in resource_.split())
+        # Try getting model from queryset
+        if hasattr(view, "queryset"):
+            return view.queryset.model
+        # Try getting model from serializer
+        if hasattr(view, "get_serializer_class"):
+            serializer_class = view.get_serializer_class()
+            if hasattr(serializer_class, "Meta"):
+                return serializer_class.Meta.model
+        return None
 
     def has_permission(self, request, view):
-        # Extract and normalize the user role
-        raw_role = getattr(request.user, "role", None)
-        if not raw_role:
-            return False
-        print(f"Raw Role: {raw_role}")
-        # Extract role as string
-        user_role = str(raw_role).strip().upper().replace(" ", "_")
+        # Get and validate required data
+        schema_name = request.tenant.schema_name if hasattr(request, "tenant") else None
+        model_class = self.get_model_class(view)
+        permission_type = self.get_permission_type(view)
 
-        # if user_role not in APPOINTMENT_PERMISSIONS:
-        #     return False
-
-        # Get permission type based on view type and method
-        permission = self.get_permission_type(view)
-        print(f"Perm Type: {permission}")
-        if not permission:
+        if not all([schema_name, model_class, permission_type]):
             return False
 
-        # Get resource name
-        normalized_resource = self.get_resource_name(view)
-        print(normalized_resource)
-        # Check cache for role permissions
-        cache_key = f"appointment_role_permissions_{user_role}"
-        permissions = cache.get(cache_key)
+        # Check cache first
+        cache_key = f"tenant_model_perm_{request.user.id}_{schema_name}_{model_class._meta.model_name}"
+        cached_permissions = cache.get(cache_key)
 
-        if permissions is None:
+        if cached_permissions is None:
+            # Get content type for the model
+            content_type = ContentType.objects.get_for_model(model_class)
+
             try:
-                role = StaffRole.objects.get(code=user_role)
-            except StaffRole.DoesNotExist as err:
-                raise ValueError(
-                    f"No StaffRole found with code: {user_role}"
-                ) from err
+                # Get tenant permission
+                tenant_perm = request.user.tenant_permissions.get(schema_name=schema_name)
 
-            permissions_queryset = role.permissions.all()
-            permissions_dict = convert_queryset_to_role_permissions(
-                permissions_queryset
-            )
-            # Cache the permissions
-            cache.set(cache_key, permissions_dict, timeout=3600)
-            permissions = permissions_dict
+                # Get all model permissions for this content type
+                model_permissions = tenant_perm.model_permissions.filter(
+                    content_type=content_type
+                ).values_list("permission_type", flat=True)
 
-        # Check permissions
-        model_permissions = permissions.get(normalized_resource, [])
-        if not model_permissions:
-            allowed_permissions = APPOINTMENT_PERMISSIONS.get(user_role, {}).get(
-                "permissions", {}
-            )
-            model_permissions = allowed_permissions.get(normalized_resource, [])
+                # Cache the permissions
+                cache.set(cache_key, list(model_permissions), timeout=3600)
+                cached_permissions = model_permissions
 
-        return permission in model_permissions
+            except request.user.tenant_permissions.model.DoesNotExist:
+                cache.set(cache_key, [], timeout=3600)
+                return False
+
+        # Check if user has required permission
+        if permission_type in cached_permissions:
+            return True
+
+        # If user has ADMIN permission type at tenant level, grant all permissions
+        try:
+            tenant_perm = request.user.tenant_permissions.get(schema_name=schema_name)
+            return tenant_perm.permission_type == "ADMIN"
+        except request.user.tenant_permissions.model.DoesNotExist:
+            return False

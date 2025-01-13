@@ -3,10 +3,12 @@ import uuid
 
 from django.apps import apps
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.db import connection, transaction
 
-from core.models import TenantPermission
+from apps.staff.models import Department, DepartmentMember
+from core.models import ModelPermission, TenantPermission
 from tenants.models import Client, Domain
 
 from .models import HospitalProfile
@@ -53,10 +55,35 @@ class TenantCreationService:
         return apps.get_model("staff", "StaffMember")
 
     @staticmethod
+    def setup_model_permissions(tenant_permission, is_admin=False):  # noqa: FBT002
+        """Han Setup initial model permissions for a user."""
+        # Define the models and their permissions
+        STAFF_MODELS = {  # noqa: N806
+            Department: ["view", "add", "change", "delete"] if is_admin else ["view"],
+            DepartmentMember: ["view", "add", "change", "delete"] if is_admin else ["view", "add"],
+            # Add other models and their permissions here
+        }
+
+        permissions_to_create = []
+        for model, actions in STAFF_MODELS.items():
+            content_type = ContentType.objects.get_for_model(model)
+            for action in actions:
+                permissions_to_create.extend([
+                    ModelPermission(
+                        tenant_permission=tenant_permission,
+                        content_type=content_type,
+                        permission_type=action
+                    )
+                ])
+
+        # Bulk create all permissions
+        ModelPermission.objects.bulk_create(permissions_to_create)
+
+    @staticmethod
     def setup_initial_permissions(tenant, admin_user):
         """ASetup initial permissions for the tenant admin."""
         # Create admin permission for the tenant
-        TenantPermission.objects.create(
+        tenant_permission = TenantPermission.objects.create(
             user=admin_user,
             schema_name=tenant.schema_name,
             permission_type="ADMIN"
@@ -65,6 +92,7 @@ class TenantCreationService:
         # Invalidate any existing permission cache for this user
         cache_key = f"tenant_access_{admin_user.id}_{tenant.schema_name}"
         cache.delete(cache_key)
+        return tenant_permission
 
     @staticmethod
     @transaction.atomic
@@ -79,6 +107,7 @@ class TenantCreationService:
             on_trial=validated_data.get("on_trial", True),
             status="active"  # Set initial status
         )
+
 
         # Create domain
         domain_name = (
@@ -95,7 +124,8 @@ class TenantCreationService:
         )
 
         # Setup initial permissions
-        TenantCreationService.setup_initial_permissions(tenant, admin_user)
+        tenant_permission = TenantCreationService.setup_initial_permissions(tenant, admin_user)
+        TenantCreationService.setup_model_permissions(tenant_permission, is_admin=True)
 
         # Create hospital profile
         hospital_profile = HospitalProfile.objects.create(
@@ -129,16 +159,24 @@ class TenantCreationService:
         if permission_type not in ["ADMIN", "STAFF", "VIEWER"]:
             raise ValueError("Invalid permission type")
 
-        # Create or update permission
-        TenantPermission.objects.update_or_create(
+        tenant_permission = TenantPermission.objects.create(
             user=user,
             schema_name=tenant.schema_name,
-            defaults={"permission_type": permission_type}
+            permission_type=permission_type
+        )
+
+        # Setup model permissions based on role
+        is_admin = permission_type == "ADMIN"
+        TenantCreationService.setup_model_permissions(
+            tenant_permission,
+            is_admin=is_admin
         )
 
         # Invalidate permission cache
         cache_key = f"tenant_access_{user.id}_{tenant.schema_name}"
         cache.delete(cache_key)
+
+        return tenant_permission
 
     @staticmethod
     @transaction.atomic

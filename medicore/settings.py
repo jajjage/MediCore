@@ -222,6 +222,7 @@ DJOSER = {
 # Custom authentication backend
 AUTHENTICATION_BACKENDS = (
     "medicore.backends.MultiSchemaModelBackend",
+    "medicore.tenant_modelperm.TenantModelPermissionBackend",
     "django.contrib.auth.backends.ModelBackend",
 )
 

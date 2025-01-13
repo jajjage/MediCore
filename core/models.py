@@ -5,6 +5,7 @@ from django.contrib.auth.models import (
     BaseUserManager,
     PermissionsMixin,
 )
+from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.db import connection, models
 
@@ -28,6 +29,41 @@ class TenantPermission(models.Model):
     class Meta:
         unique_together = ["user", "schema_name"]
         db_table = "core_tenant_permission"
+
+class ModelPermission(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    tenant_permission = models.ForeignKey(
+        TenantPermission,
+        on_delete=models.CASCADE,
+        related_name="model_permissions"
+    )
+
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        help_text="The model this permission applies to"
+    )
+
+    PERMISSION_TYPES = [
+        ("view", "Can View"),
+        ("add", "Can Add"),
+        ("change", "Can Change"),
+        ("delete", "Can Delete"),
+    ]
+    permission_type = models.CharField(
+        max_length=10,
+        choices=PERMISSION_TYPES,
+        help_text="The type of permission granted"
+    )
+
+    class Meta:
+        db_table = "core_model_permission"
+        unique_together = ["tenant_permission", "content_type", "permission_type"]
+
+    def __str__(self):
+        return f"{self.tenant_permission.user.email} - {self.get_permission_type_display()} {self.content_type.model}"
+
 
 
 class MyUserManager(BaseUserManager):

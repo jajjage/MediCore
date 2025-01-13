@@ -1,24 +1,20 @@
 from rest_framework.generics import ListAPIView
 
 from .models import Department, DepartmentMember
-from .permissions import AppointmentRolePermission
+from .permissions import TenantModelPermission
 from .serializers import DepartmentDoctorSerializer, DepartmentListSerializer
 
 
 class ClinicalDepartmentListView(ListAPIView):
     serializer_class = DepartmentListSerializer
-    permission_classes = [AppointmentRolePermission]
+    permission_classes = [TenantModelPermission]
+    queryset = Department.objects.all()
     name= "department"
 
-    print("the view")
-    def get_queryset(self):
-        return Department.objects.filter(
-            department_type="CLINICAL"
-        ).order_by("name")
 
 class DepartmentDoctorsView(ListAPIView):
     serializer_class = DepartmentDoctorSerializer
-    permission_classes = [AppointmentRolePermission]
+    permission_classes = [TenantModelPermission]
     name = "departmentmember"
 
     def get_queryset(self):

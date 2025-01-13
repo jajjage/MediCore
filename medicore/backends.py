@@ -51,14 +51,4 @@ class MultiSchemaModelBackend(ModelBackend):
                 return None
         return None
 
-    # This would be use to get the user from the token later
-    def get_user(self, user_id):
-        usermodel = (
-            StaffMember
-            if connection.schema_name != get_public_schema_name()
-            else get_user_model()
-        )
-        try:
-            return usermodel.objects.get(pk=user_id)
-        except usermodel.DoesNotExist:
-            return None
+
