@@ -1,6 +1,6 @@
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.viewsets import ViewSet
 
 
@@ -8,8 +8,11 @@ class TenantModelPermission(BasePermission):
     """
     Custom permission to check user permissions based on tenant and model level.
 
-    Handles both ViewSets and APIViews.
+    Works with DEFAULT_AUTHENTICATION_CLASSES setting.
     """
+
+    def __init__(self):
+        self.authenticated_permission = IsAuthenticated()
 
     def get_permission_type(self, view):
         """
@@ -53,13 +56,18 @@ class TenantModelPermission(BasePermission):
         return None
 
     def has_permission(self, request, view):
-        # Get and validate required data
-        schema_name = request.tenant.schema_name if hasattr(request, "tenant") else None
+        # Perform initial validations
+        if not all([
+            self.authenticated_permission.has_permission(request, view),
+            hasattr(request, "tenant") and request.tenant.schema_name,
+            self.get_model_class(view),
+            self.get_permission_type(view)
+        ]):
+            return False
+
+        schema_name = request.tenant.schema_name
         model_class = self.get_model_class(view)
         permission_type = self.get_permission_type(view)
-
-        if not all([schema_name, model_class, permission_type]):
-            return False
 
         # Check cache first
         cache_key = f"tenant_model_perm_{request.user.id}_{schema_name}_{model_class._meta.model_name}"
@@ -84,15 +92,11 @@ class TenantModelPermission(BasePermission):
 
             except request.user.tenant_permissions.model.DoesNotExist:
                 cache.set(cache_key, [], timeout=3600)
-                return False
+                cached_permissions = []
 
-        # Check if user has required permission
-        if permission_type in cached_permissions:
-            return True
-
-        # If user has ADMIN permission type at tenant level, grant all permissions
+        # Check permission type or admin status
         try:
             tenant_perm = request.user.tenant_permissions.get(schema_name=schema_name)
-            return tenant_perm.permission_type == "ADMIN"
+            return permission_type in cached_permissions or tenant_perm.permission_type == "ADMIN"
         except request.user.tenant_permissions.model.DoesNotExist:
             return False

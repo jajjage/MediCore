@@ -67,7 +67,6 @@ class RobustCookieJWTAuthentication(JWTAuthentication):
             schema_name = connection.schema_name
             is_public_schema = schema_name == get_public_schema_name()
 
-            print(f"validated token: {validated_token} schema name: {schema_name} its public_schema:{is_public_schema}")
             if is_public_schema:
                 user, user_model = self._get_public_schema_user(validated_token)
                 if not isinstance(user, user_model):

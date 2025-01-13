@@ -12,6 +12,9 @@ class StaffProfile(models.Model):
     years_of_experience = models.PositiveIntegerField()
     certification_number = models.CharField(max_length=100, blank=True)
     specialty_notes = models.TextField(blank=True)
+    emergency_response_qualified = models.BooleanField(default=False)
+    shift_preferences = models.JSONField(default=dict)
+    max_continuous_hours = models.IntegerField(default=12)
 
     class Meta:
         abstract = True
@@ -51,11 +54,6 @@ class NurseProfile(StaffProfile):
     )
     nurse_license = models.CharField(max_length=50, unique=True)
     ward_specialty = models.CharField(max_length=100)
-    shift_preferences = models.JSONField(
-        default=dict,
-        help_text="Shift preferences in JSON format"
-    )
-
     class Meta:
         db_table = "nurse_profile"
 
