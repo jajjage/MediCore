@@ -3,6 +3,9 @@ from django.core.cache import cache
 from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.viewsets import ViewSet
 
+from hospital.models import HospitalProfile
+from tenants.models import Client
+
 
 class TenantModelPermission(BasePermission):
     """
@@ -55,6 +58,30 @@ class TenantModelPermission(BasePermission):
                 return serializer_class.Meta.model
         return None
 
+    def check_hospital_profile_association(self, user, schema_name):
+        """
+        Check if user is properly associated with the hospital profile for this tenant.
+        """
+        try:
+            # Get the tenant for this schema
+            tenant = Client.objects.get(schema_name=schema_name)
+
+            # Get hospital profile for this tenant
+            hospital_profile = HospitalProfile.objects.get(tenant=tenant)
+
+            # Check if user is either the admin or in additional staff for this specific hospital
+            is_admin = (hasattr(user, "administered_hospital") and
+                       user.administered_hospital == hospital_profile)
+
+            is_staff = (hasattr(user, "associated_hospitals") and
+                       hospital_profile in user.associated_hospitals.all())
+
+            # User must be properly associated with this hospital profile
+            return is_admin or is_staff
+
+        except (Client.DoesNotExist, HospitalProfile.DoesNotExist):
+            return False
+
     def has_permission(self, request, view):
         # Perform initial validations
         if not all([
@@ -69,7 +96,11 @@ class TenantModelPermission(BasePermission):
         model_class = self.get_model_class(view)
         permission_type = self.get_permission_type(view)
 
-        # Check cache first
+        # First check hospital profile association
+        if not self.check_hospital_profile_association(request.user, schema_name):
+            return False
+
+        # Check cache for permissions
         cache_key = f"tenant_model_perm_{request.user.id}_{schema_name}_{model_class._meta.model_name}"
         cached_permissions = cache.get(cache_key)
 
@@ -97,6 +128,7 @@ class TenantModelPermission(BasePermission):
         # Check permission type or admin status
         try:
             tenant_perm = request.user.tenant_permissions.get(schema_name=schema_name)
-            return permission_type in cached_permissions or tenant_perm.permission_type == "ADMIN"
+            return (permission_type in cached_permissions or
+                   tenant_perm.permission_type == "ADMIN")
         except request.user.tenant_permissions.model.DoesNotExist:
             return False

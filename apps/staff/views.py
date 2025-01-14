@@ -80,7 +80,9 @@ class DepartmentViewSet(BaseViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         # Get the HospitalProfile instance from the user
-        user_hospital = getattr(self.request.user, "hospital_profile", None)
+        user = self.request.user
+        user_hospital = getattr(user, "administered_hospital", None) or getattr(user, "associated_hospitals", None)
+        print(user_hospital)
         if user_hospital:
             return queryset.filter(hospital=user_hospital)
         return queryset.none()
@@ -126,15 +128,22 @@ class StaffMemberViewSet(BaseViewSet):
     search_fields = ["first_name", "last_name", "email"]
     ordering_fields = ["first_name", "last_name", "created_at"]
 
-    def get_queryset(self):
-        queryset = StaffMember.objects.select_related(
+    queryset = StaffMember.objects.select_related(
             "hospital",
             "role"
         ).prefetch_related(
             "department_memberships__department",
             "role__permissions"
         )
-        return super().get_queryset().filter(queryset)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        user_hospital = getattr(user, "administered_hospital", None) or getattr(user, "associated_hospitals", None)
+        print(user_hospital)
+        if user_hospital:
+            return queryset.filter(hospital=user_hospital)
+        return queryset.none()
 
     @transaction.atomic
     def perform_create(self, serializer):

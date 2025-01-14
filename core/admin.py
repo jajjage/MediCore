@@ -1,8 +1,9 @@
 from django.contrib import admin
 
-from .models import MyUser
+from .models import ModelPermission, MyUser, TenantPermission
 
-
+admin.site.register(TenantPermission)
+admin.site.register(ModelPermission)
 class CustomUserAdmin(admin.ModelAdmin):  # Changed from UserAdmin to admin.ModelAdmin
     list_display = ["email", "hospital", "is_superuser", "is_tenant_admin"]
     list_filter = ["is_superuser", "is_tenant_admin"]

@@ -63,7 +63,7 @@ class TechnicianProfileFilter(ProfileFilter):
 class DepartmentFilter(filters.FilterSet):
     name = filters.CharFilter(lookup_expr="icontains")
     code = filters.CharFilter(lookup_expr="icontains")
-    department_type = filters.MultipleChoiceFilter(
+    department_type = filters.TypedChoiceFilter(
         choices=Department.DEPARTMENT_TYPES,
         required=False
     )
