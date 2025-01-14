@@ -1,12 +1,12 @@
-from django.contrib import admin
-from django.contrib import messages
+from django.contrib import admin, messages
 from django.db import transaction
-from tenants.models import Client
-from .models import HospitalProfile
+
 from core.models import MyUser
+from tenants.models import Client
+
+from .models import HospitalProfile, HospitalStaffMembership
 
 
-@admin.register(HospitalProfile)
 class HospitalProfileAdmin(admin.ModelAdmin):
     list_display = [
         "hospital_name",
@@ -74,7 +74,7 @@ class HospitalProfileAdmin(admin.ModelAdmin):
                     admin_user = MyUser.objects.create_tenant_admin(
                         email=obj.contact_email,
                         hospital=tenant,
-                        password="changeme123",  # Temporary password
+                        password="changeme123",  # Temporary password  # noqa: S106
                     )
 
                     # Link everything to the hospital profile
@@ -92,11 +92,11 @@ class HospitalProfileAdmin(admin.ModelAdmin):
                     )
 
         except Exception as e:
-            messages.error(request, f"Error creating hospital: {str(e)}")
+            messages.error(request, f"Error creating hospital: {e!s}")
             raise
 
     def generate_schema_name(self, hospital_name):
-        """Generate a valid schema name from hospital name"""
+        """Generate a valid schema name from hospital name."""
         # Convert to lowercase and replace spaces with underscores
         schema_name = hospital_name.lower().replace(" ", "_")
         # Remove any non-alphanumeric characters except underscore
@@ -110,7 +110,7 @@ class HospitalProfileAdmin(admin.ModelAdmin):
         return schema_name
 
     def has_module_permission(self, request):
-        """Only superuser can see this module in admin"""
+        """Only superuser can see this module in admin."""
         return request.user.is_superuser
 
     def has_view_permission(self, request, obj=None):
@@ -124,3 +124,6 @@ class HospitalProfileAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
+
+admin.site.register(HospitalProfile, HospitalProfileAdmin)
+admin.site.register(HospitalStaffMembership)

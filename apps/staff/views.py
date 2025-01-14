@@ -1,15 +1,13 @@
-from time import timezone
-
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connection, transaction
 from django.db.models import Sum
+from django.utils.timezone import now
 from django_filters import rest_framework as django_filters
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
-
-from core import serializers
 
 from .models import (
     Department,
@@ -82,7 +80,6 @@ class DepartmentViewSet(BaseViewSet):
         # Get the HospitalProfile instance from the user
         user = self.request.user
         user_hospital = getattr(user, "administered_hospital", None) or getattr(user, "associated_hospitals", None)
-        print(user_hospital)
         if user_hospital:
             return queryset.filter(hospital=user_hospital)
         return queryset.none()
@@ -109,18 +106,25 @@ class DepartmentViewSet(BaseViewSet):
     @transaction.atomic
     def perform_create(self, serializer):
         try:
-            instance = serializer.save()
+            user = self.request.user
+            user_hospital = getattr(user, "administered_hospital", None) or getattr(user, "associated_hospitals", None)
+            if not user_hospital:
+                raise DRFValidationError("No hospital associated for this current user")
+            instance = serializer.save(hospital=user_hospital)
+            print(serializer.data)
             # Create department head assignment if specified
             if instance.department_head:
                 DepartmentMember.objects.create(
                     department=instance,
                     user=instance.department_head,
                     role="HEAD",
-                    start_date=timezone.now().date(),
+                    start_date=now(),
                     is_primary=True
                 )
-        except ValidationError as e:
-            raise serializers.ValidationError(e.message_dict) from e
+        except DjangoValidationError as e:
+            raise DRFValidationError(e.message_dict) from e
+        except Exception as e:
+            raise DRFValidationError(detail=str(e)) from e
 
 class StaffMemberViewSet(BaseViewSet):
     serializer_class = StaffMemberSerializer
@@ -168,7 +172,7 @@ class StaffMemberViewSet(BaseViewSet):
             try:
                 serializer.save(user=staff_member)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
-            except ValidationError as e:
+            except DRFValidationError as e:
                 return Response(
                     {"detail": str(e)},
                     status=status.HTTP_400_BAD_REQUEST
@@ -218,7 +222,7 @@ class StaffRoleViewSet(BaseViewSet):
                 StaffRoleSerializer(role).data,
                 status=status.HTTP_200_OK
             )
-        except (ValidationError, StaffRole.permissions.RelatedObjectDoesNotExist) as e:
+        except (DjangoValidationError, StaffRole.permissions.RelatedObjectDoesNotExist) as e:
             return Response(
                 {"detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
@@ -258,7 +262,7 @@ class DepartmentMemberViewSet(BaseViewSet):
             ).count()
 
             if future_staff_count < department.minimum_staff_required:
-                raise ValidationError(
+                raise DRFValidationError(
                     "Cannot end assignment - minimum staffing levels not maintained"
                 )
 
@@ -286,7 +290,7 @@ class DepartmentMemberViewSet(BaseViewSet):
 
             return Response(DepartmentMemberSerializer(assignment).data)
 
-        except ValidationError as e:
+        except DRFValidationError as e:
             return Response({"detail": str(e)},
                         status=status.HTTP_400_BAD_REQUEST)
 
@@ -356,7 +360,7 @@ class StaffTransferViewSet(BaseViewSet):
             from_assignment.save()
 
             return Response(self.get_serializer(transfer).data)
-        except ValidationError as e:
+        except DRFValidationError as e:
             return Response(
                 {"detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST

@@ -7,11 +7,21 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.db import connection, transaction
 
-from apps.staff.models import Department, DepartmentMember
+from apps.staff.models import (
+    Department,
+    DepartmentMember,
+    DoctorProfile,
+    NurseProfile,
+    StaffMember,
+    StaffRole,
+    StaffTransfer,
+    TechnicianProfile,
+    WorkloadAssignment,
+)
 from core.models import ModelPermission, TenantPermission
 from tenants.models import Client, Domain
 
-from .models import HospitalProfile
+from .models import HospitalProfile, HospitalStaffMembership
 
 
 def generate_schema_name(hospital_name: str, max_length: int = 63) -> str:
@@ -55,12 +65,33 @@ class TenantCreationService:
         return apps.get_model("staff", "StaffMember")
 
     @staticmethod
+    def add_hospital_membership(hospital, user, tenant_permission ):
+        """
+        Add a staff member to the hospital profile and ensure tenant association.
+        """
+        # Create the membership record explicitly
+        HospitalStaffMembership.objects.create(
+            hospital=hospital,
+            user=user,
+            tenant_permission=tenant_permission,
+            is_active=True
+        )
+
+
+    @staticmethod
     def setup_model_permissions(tenant_permission, is_admin=False):  # noqa: FBT002
         """Han Setup initial model permissions for a user."""
         # Define the models and their permissions
         STAFF_MODELS = {  # noqa: N806
             Department: ["view", "add", "change", "delete"] if is_admin else ["view"],
-            DepartmentMember: ["view", "add", "change", "delete"] if is_admin else ["view", "add"],
+            DepartmentMember: ["view", "add", "change", "delete"] if is_admin else ["view"],
+            NurseProfile: ["view", "add", "change", "delete"] if is_admin else ["view"],
+            DoctorProfile: ["view", "add", "change", "delete"] if is_admin else ["view"],
+            StaffMember: ["view", "add", "change", "delete"] if is_admin else ["view"],
+            StaffRole: ["view", "add", "change", "delete"] if is_admin else ["view"],
+            StaffTransfer: ["view", "add", "change", "delete"] if is_admin else ["view"],
+            TechnicianProfile: ["view", "add", "change", "delete"] if is_admin else ["view"],
+            WorkloadAssignment: ["view", "add", "change", "delete"] if is_admin else ["view"],
             # Add other models and their permissions here
         }
 
@@ -120,6 +151,9 @@ class TenantCreationService:
         admin_user = user_model.objects.create_tenant_admin(
             email=validated_data["admin_email"],
             password=validated_data["admin_password"],
+            first_name=validated_data["admin_first_name"],
+            last_name=validated_data["admin_last_name"],
+            phone_number=validated_data["admin_phone_number"],
             hospital=tenant,
         )
 
@@ -140,7 +174,7 @@ class TenantCreationService:
             specialty=validated_data.get("specialty", ""),
             bed_capacity=validated_data.get("bed_capacity"),
         )
-
+        TenantCreationService.add_hospital_membership(hospital_profile, admin_user, tenant_permission)
         return hospital_profile
 
     @staticmethod

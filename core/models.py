@@ -70,7 +70,7 @@ class ModelPermission(models.Model):
 
 
 class MyUserManager(BaseUserManager):
-    def create_tenant_admin(self, email, hospital, password=None):
+    def create_tenant_admin(self, email, hospital, password=None, **kwargs):
         if not email:
             raise ValueError("Users must have an email address")
         if not hospital:
@@ -79,7 +79,8 @@ class MyUserManager(BaseUserManager):
         user = self.model(
             email=self.normalize_email(email),
             hospital=hospital,
-            is_tenant_admin=True
+            is_tenant_admin=True,
+            **kwargs
         )
         user.set_password(password)
         user.save(using=self._db)

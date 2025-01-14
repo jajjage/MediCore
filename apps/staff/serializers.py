@@ -21,6 +21,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
     sub_departments = serializers.SerializerMethodField()
     is_clinical = serializers.BooleanField(read_only=True)
     full_hierarchy_name = serializers.CharField(read_only=True)
+    hospital = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Department
@@ -122,14 +123,13 @@ class StaffRoleSerializer(serializers.ModelSerializer):
 class DepartmentMemberSerializer(serializers.ModelSerializer):
     workload = WorkloadAssignmentSerializer(many=True, read_only=True)
     transfers = StaffTransferSerializer(many=True, read_only=True)
-    schedule_conflicts = serializers.SerializerMethodField()
+    # schedule_conflicts = serializers.SerializerMethodField()
 
     class Meta:
         model = DepartmentMember
         fields = ["id", "department", "user", "role", "start_date", "end_date",
                  "is_primary", "assignment_type", "time_allocation",
-                 "schedule_pattern", "workload", "transfers",
-                 "schedule_conflicts"]
+                 "schedule_pattern", "workload", "transfers"]
 
     def validate(self, data):
         # Validate schedule conflicts
@@ -251,5 +251,3 @@ class StaffMemberSerializer(serializers.ModelSerializer):
                 "Both first name and last name are required"
             )
         return data
-
-
