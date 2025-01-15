@@ -44,7 +44,8 @@ class StaffMember(AbstractUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     hospital = models.ForeignKey(
-        "hospital.HospitalProfile", on_delete=models.CASCADE, null=True, blank=True
+        "hospital.HospitalProfile", on_delete=models.CASCADE, null=True, blank=True,
+        related_name="staff_hospital"
     )
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)

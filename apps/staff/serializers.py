@@ -2,6 +2,8 @@ from django.contrib.auth.models import Permission
 from django.db import transaction
 from rest_framework import serializers
 
+from hospital.models import HospitalProfile
+
 from .models import (
     Department,
     DepartmentMember,
@@ -192,19 +194,67 @@ class StaffMemberSerializer(serializers.ModelSerializer):
     role_permissions = serializers.SerializerMethodField()
     departments = serializers.SerializerMethodField()
     current_roles = serializers.SerializerMethodField()
+    role = serializers.CharField()
+    password = serializers.CharField(write_only=True, required=False)  # For accepting plain password
+    hashed_password = serializers.CharField(source="password", read_only=True)  # For displaying hashed password
     primary_department = serializers.SerializerMethodField()
     department_memberships = DepartmentMemberSerializer(many=True, read_only=True)
-    # staff_profile = serializers.SerializerMethodField()
     doctor_profile = DoctorProfileSerializer(required=False)
 
     class Meta:
         model = StaffMember
-        fields = ["id", "email", "hospital", "first_name", "last_name",
-                 "full_name", "role", "is_active", "role_permissions",
-                 "departments", "current_roles", "primary_department",
-                 "department_memberships", "doctor_profile"]
-        read_only_fields = ["id", "role_permissions", "departments",
-                           "current_roles", "primary_department", "doctor_profile"]
+        fields = [
+            "id", "email", "first_name", "last_name", "password",
+            "full_name", "role", "is_active", "role_permissions",
+            "departments", "current_roles", "primary_department",
+            "department_memberships", "doctor_profile", "hashed_password",
+            "department_memberships",
+        ]
+        read_only_fields = [
+            "id", "role_permissions", "departments",
+            "current_roles", "primary_department", "doctor_profile", "hashed_password",
+        ]
+        extra_kwargs = {
+            "password": {"write_only": True}
+        }
+
+    def validate_role(self, value):
+        """
+        Convert the role name (string) to the corresponding StaffRole object.
+        """
+        try:
+            role = StaffRole.objects.get(name=value)
+            return role
+        except StaffRole.DoesNotExist as e:
+            raise serializers.ValidationError(f"Role '{value}' does not exist.") from e
+
+    def validate(self, data):
+        request = self.context.get("request")
+        if not request:
+            raise serializers.ValidationError("Request object is required in the context.")
+
+        user = request.user
+
+        # Validate required fields
+        if request.method == "POST":
+            if not data.get("email"):
+                raise serializers.ValidationError("Email is required.")
+            if not data.get("first_name") or not data.get("last_name"):
+                raise serializers.ValidationError("Both first name and last name are required.")
+
+
+        # Get the hospital profile based on the user's tenant (Client)
+        try:
+            hospital_profile = HospitalProfile.objects.get(tenant=user.hospital)
+            data["hospital"] = hospital_profile
+        except HospitalProfile.DoesNotExist as e:
+            raise serializers.ValidationError(
+                "No hospital profile found for the current user's tenant."
+            ) from e
+        except Exception as e:
+            raise serializers.ValidationError(f"Error getting hospital profile: {e!s}") from e
+
+        return data
 
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
@@ -233,33 +283,74 @@ class StaffMemberSerializer(serializers.ModelSerializer):
             return DepartmentSerializer(primary.department).data
         return None
 
-    # def get_staff_profile(self, obj):
-    #     profile = obj.staff_profile
-    #     if not profile:
-    #         return None
-
-    #     if isinstance(profile, DoctorProfile):
-    #         return DoctorProfileSerializer(profile).data
-    #     if isinstance(profile, NurseProfile):
-    #         return NurseProfileSerializer(profile).data
-    #     if isinstance(profile, TechnicianProfile):
-    #         return TechnicianProfileSerializer(profile).data
-    #     return None
-
-    def validate(self, data):
-        # Validate required fields
-        if not data.get("email"):
-            raise serializers.ValidationError("Email is required")
-        if not data.get("first_name") or not data.get("last_name"):
-            raise serializers.ValidationError(
-                "Both first name and last name are required"
-            )
-        return data
-
     @transaction.atomic
     def create(self, validated_data):
-        doctorprofile = validated_data.pop("doctor_profile", {})
-        staff_member = StaffMember.objects.create(**validated_data)
-        DoctorProfile.objects.create(staff_member=staff_member, **doctorprofile)
+        doctor_profile_data = validated_data.pop("doctor_profile", {})
+        password = validated_data.pop("password", None)
 
+        # Ensure hospital is included in creation
+        hospital = validated_data.get("hospital")
+        if not hospital:
+            request = self.context.get("request")
+            if request and hasattr(request.user, "hospital"):
+                try:
+                    hospital = HospitalProfile.objects.get(tenant=request.user.hospital)
+                    validated_data["hospital"] = hospital
+                except HospitalProfile.DoesNotExist as e:
+                    raise (f"Failed to get hospital profile in create method; {(e)}") from e
+
+        # Create the staff member with explicit hospital assignment
+        staff_member = StaffMember.objects.create(
+            hospital=validated_data.pop("hospital"),
+            **validated_data
+        )
+
+        if password:
+            staff_member.set_password(password)
+            staff_member.save()
+
+        # Create doctor profile if data is provided
+        if doctor_profile_data:
+            DoctorProfile.objects.create(
+                staff_member=staff_member,
+                **doctor_profile_data
+            )
         return staff_member
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        doctor_profile_data = validated_data.pop("doctor_profile", {})
+
+        if "password" in validated_data:
+            password = validated_data.pop("password")
+            instance.set_password(password)
+            # Save immediately to ensure password is hashed
+            instance.save(update_fields=["password"])
+        # Update the staff member fields
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Update doctor profile if it exists and data is provided
+        if doctor_profile_data and hasattr(instance, "doctor_profile"):
+            doctor_profile = instance.doctor_profile
+            for attr, value in doctor_profile_data.items():
+                setattr(doctor_profile, attr, value)
+            doctor_profile.save()
+
+        return instance
+
+    def to_representation(self, instance):
+        """
+        Override to_representation to ensure hospital is included in response.
+        """
+        data = super().to_representation(instance)
+        if instance.hospital:
+            data["hospital"] = instance.hospital.id
+
+        # Rename hashed_password to password in the output
+        if "hashed_password" in data:
+            data["password"] = data.pop("hashed_password")
+
+        return data
