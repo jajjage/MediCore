@@ -11,6 +11,11 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 logger = logging.getLogger(__name__)
 
 class RobustCookieJWTAuthentication(JWTAuthentication):
+    def _check_low_level_user_access(self, user, schema_name):
+        """
+        Verify access for low-level users living within the tenant schema.
+        """
+        return user.hospital and user.hospital.tenant.schema_name == schema_name
     def get_user_from_model(self, validated_token, user_model):
         """AHelper method to get user from a specific model."""
         try:
@@ -67,7 +72,6 @@ class RobustCookieJWTAuthentication(JWTAuthentication):
             schema_name = connection.schema_name
             is_public_schema = schema_name == get_public_schema_name()
 
-            print(f"validated token: {validated_token} schema name: {schema_name} its public_schema:{is_public_schema}")
             if is_public_schema:
                 user, user_model = self._get_public_schema_user(validated_token)
                 if not isinstance(user, user_model):
@@ -75,10 +79,20 @@ class RobustCookieJWTAuthentication(JWTAuthentication):
             else:
                 user, user_model, staffmember = self._get_tenant_schema_user(validated_token)
                 if not is_public_schema and isinstance(user, (user_model, staffmember)):
+                    is_high_level_user = hasattr(user, "has_tenant_access")
                     cache_key = f"tenant_access_{user.id}_{schema_name}"
                     has_access = cache.get(cache_key)
                     if has_access is None:
-                        has_access = user.has_tenant_access(schema_name)
+                        if is_high_level_user:
+                            # High-level user access logic
+                            has_access = user.has_tenant_access(schema_name)
+                             # You might want to add the permission type to the request
+                            request.tenant_permission_type = user.get_tenant_permission_type(schema_name)
+                        else:
+                            # Low-level user access logic
+                            has_access = self._check_low_level_user_access(user, schema_name)
+                            print(f"user hospital {user.first_name}")
+
                         cache.set(cache_key, has_access, timeout=300)
 
                     if not has_access:
@@ -87,9 +101,8 @@ class RobustCookieJWTAuthentication(JWTAuthentication):
                             f"tenant {schema_name}"
                         )
                         raise TokenError("User not authorized for this tenant")
-
-                    # You might want to add the permission type to the request
-                    request.tenant_permission_type = user.get_tenant_permission_type(schema_name)
+                    if is_high_level_user:
+                        request.tenant_permission_type = user.get_tenant_permission_type(schema_name)
             return user, validated_token
 
         except (TokenError, InvalidToken) as e:

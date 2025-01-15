@@ -40,6 +40,7 @@ class Department(models.Model):
     department_type = models.CharField(
         max_length=20,
         choices=DEPARTMENT_TYPES,
+        default="CLINICAL",
         help_text=_("Type/category of the department")
     )
 
@@ -60,6 +61,9 @@ class Department(models.Model):
         related_name="departments",
         help_text=_("Hospital this department belongs to")
     )
+
+    min_staff_per_shift = models.IntegerField(default=0)
+    emergency_min_staff = models.IntegerField(default=0)
 
     # Department Details
     description = models.TextField(

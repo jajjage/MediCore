@@ -1,15 +1,21 @@
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.viewsets import ViewSet
+
+from hospital.models import HospitalProfile
+from tenants.models import Client
 
 
 class TenantModelPermission(BasePermission):
     """
     Custom permission to check user permissions based on tenant and model level.
 
-    Handles both ViewSets and APIViews.
+    Works with DEFAULT_AUTHENTICATION_CLASSES setting.
     """
+
+    def __init__(self):
+        self.authenticated_permission = IsAuthenticated()
 
     def get_permission_type(self, view):
         """
@@ -52,16 +58,49 @@ class TenantModelPermission(BasePermission):
                 return serializer_class.Meta.model
         return None
 
+    def check_hospital_profile_association(self, user, schema_name):
+        """
+        Check if user is properly associated with the hospital profile for this tenant.
+        """
+        try:
+            # Get the tenant for this schema
+            tenant = Client.objects.get(schema_name=schema_name)
+
+            # Get hospital profile for this tenant
+            hospital_profile = HospitalProfile.objects.get(tenant=tenant)
+
+            # Check if user is either the admin or in additional staff for this specific hospital
+            is_admin = (hasattr(user, "administered_hospital") and user.hospitalstaffmembership_set.exists() and
+                       user.administered_hospital == hospital_profile)
+
+            is_staff = (hasattr(user, "associated_hospitals") and user.hospitalstaffmembership_set.exists() and
+                       hospital_profile in user.associated_hospitals.all())
+
+            # User must be properly associated with this hospital profile
+            return is_admin or is_staff
+
+        except (Client.DoesNotExist, HospitalProfile.DoesNotExist):
+            return False
+
     def has_permission(self, request, view):
-        # Get and validate required data
-        schema_name = request.tenant.schema_name if hasattr(request, "tenant") else None
+        # Perform initial validations
+        if not all([
+            self.authenticated_permission.has_permission(request, view),
+            hasattr(request, "tenant") and request.tenant.schema_name,
+            self.get_model_class(view),
+            self.get_permission_type(view)
+        ]):
+            return False
+
+        schema_name = request.tenant.schema_name
         model_class = self.get_model_class(view)
         permission_type = self.get_permission_type(view)
 
-        if not all([schema_name, model_class, permission_type]):
+        # First check hospital profile association
+        if not self.check_hospital_profile_association(request.user, schema_name):
             return False
 
-        # Check cache first
+        # Check cache for permissions
         cache_key = f"tenant_model_perm_{request.user.id}_{schema_name}_{model_class._meta.model_name}"
         cached_permissions = cache.get(cache_key)
 
@@ -84,15 +123,12 @@ class TenantModelPermission(BasePermission):
 
             except request.user.tenant_permissions.model.DoesNotExist:
                 cache.set(cache_key, [], timeout=3600)
-                return False
+                cached_permissions = []
 
-        # Check if user has required permission
-        if permission_type in cached_permissions:
-            return True
-
-        # If user has ADMIN permission type at tenant level, grant all permissions
+        # Check permission type or admin status
         try:
             tenant_perm = request.user.tenant_permissions.get(schema_name=schema_name)
-            return tenant_perm.permission_type == "ADMIN"
+            return (permission_type in cached_permissions or
+                   tenant_perm.permission_type == "ADMIN")
         except request.user.tenant_permissions.model.DoesNotExist:
             return False

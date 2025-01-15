@@ -7,7 +7,10 @@ from django.contrib.auth.models import (
 )
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.db import connection, models
+
+from hospital.models import HospitalProfile
 
 
 class TenantPermission(models.Model):
@@ -67,7 +70,7 @@ class ModelPermission(models.Model):
 
 
 class MyUserManager(BaseUserManager):
-    def create_tenant_admin(self, email, hospital, password=None):
+    def create_tenant_admin(self, email, hospital, password=None, **kwargs):
         if not email:
             raise ValueError("Users must have an email address")
         if not hospital:
@@ -76,7 +79,8 @@ class MyUserManager(BaseUserManager):
         user = self.model(
             email=self.normalize_email(email),
             hospital=hospital,
-            is_tenant_admin=True
+            is_tenant_admin=True,
+            **kwargs
         )
         user.set_password(password)
         user.save(using=self._db)
@@ -100,13 +104,19 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
         "tenants.Client",
         on_delete=models.CASCADE,
         null=True,
-        blank=True
+        blank=True,
+        related_name="staff_members"
     )
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=True)
     is_tenant_admin = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
+    first_name = models.CharField(max_length=150, blank=True)
+    last_name = models.CharField(max_length=150, blank=True)
+    phone_number = models.CharField(max_length=20, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     groups = models.ManyToManyField(
         "auth.Group",
@@ -129,6 +139,18 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
 
     class Meta:
         db_table = "core_user"
+
+    def clean(self):
+        if self.is_tenant_admin and not self.hospital:
+            raise ValidationError("Tenant admin must be associated with a hospital")
+
+        if self.hospital:
+            try:
+                profile = HospitalProfile.objects.get(tenant=self.hospital)
+                if self.is_tenant_admin and profile.admin_user_id and profile.admin_user_id != self.id:
+                    raise ValidationError("This hospital already has a primary admin")
+            except HospitalProfile.DoesNotExist as err:
+                raise ValidationError("Associated hospital has no profile") from err
 
     def has_tenant_access(self, schema_name):
         """Check if user has access to specific tenant."""

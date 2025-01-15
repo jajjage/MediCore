@@ -1,10 +1,12 @@
 import uuid
 
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 
 from .departments import Department
+from .staff_transfer import StaffTransfer
 
 
 class DepartmentMember(models.Model):
@@ -55,6 +57,30 @@ class DepartmentMember(models.Model):
         help_text=_("Whether this is the staff member's primary department")
     )
 
+    assignment_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("PERMANENT", "Permanent Assignment"),
+            ("TEMPORARY", "Temporary Assignment"),
+            ("ROTATION", "Rotation"),
+            ("ON_CALL", "On-Call Coverage"),
+            ("TRAINING", "Training Period")
+        ],
+        default="PERMANENT"
+    )
+
+    time_allocation = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        help_text="Percentage of time allocated to this department",
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+
+    schedule_pattern = models.JSONField(
+        default=dict,
+        help_text="Weekly/monthly schedule pattern"
+    )
+
     # Meta
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -71,6 +97,10 @@ class DepartmentMember(models.Model):
         help_text=_("Whether the assignment is currently active")
     )
 
+    max_weekly_hours = models.IntegerField(default=40)
+    rest_period_hours = models.IntegerField(default=12)
+    emergency_contact = models.CharField(max_length=100)
+    is_emergency_response = models.BooleanField(default=False)
     class Meta:
         db_table = "department_member"
         unique_together = ["department", "user", "role"]
@@ -108,6 +138,49 @@ class DepartmentMember(models.Model):
                     "user": "User must belong to the same hospital as the department",
                     "department": "Department must belong to the same hospital as the user"
                 })
+    def assign_schedule(self, schedule_data, start_date, end_date):
+        """
+        Assign working schedule for the staff member.
+        """
+        self.schedule_pattern = {
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "pattern": schedule_data
+        }
+        self.save()
+
+    def initiate_transfer(self, to_department, transfer_type, effective_date, **kwargs):
+        with transaction.atomic():
+            # Create new department assignment
+            new_assignment = DepartmentMember.objects.create(
+                user=self.user,
+                department=to_department,
+                role=self.role,
+                start_date=effective_date,
+                assignment_type="TRANSFER",
+                time_allocation=kwargs.get("time_allocation", 100)
+            )
+
+            # Create transfer record
+            transfer = StaffTransfer.objects.create(
+                from_assignment=self,
+                to_assignment=new_assignment,
+                transfer_type=transfer_type,
+                effective_date=effective_date,
+                **kwargs
+            )
+
+            # Handle primary department changes
+            if self.is_primary:
+                self.is_primary = False
+                new_assignment.is_primary = True
+
+            # Update end date for current assignment
+            self.end_date = effective_date
+            self.is_active = False
+            self.save()
+
+            return transfer
 
     @classmethod
     def from_db(cls, db, field_names, values):

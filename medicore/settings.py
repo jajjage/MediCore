@@ -36,6 +36,7 @@ DEFAULT_APPS = [
     "rest_framework_simplejwt",
     "corsheaders",
     "simple_history",
+    "django_filters",
 ]
 
 # Apps that are specific to individual tenants
@@ -167,6 +168,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "apps.patients.permissions.RolePermission",
     ],
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
 }
 
 
