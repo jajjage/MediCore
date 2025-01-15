@@ -5,7 +5,8 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+
+from apps.patients.base_view.base_patients_view import BasePatientViewSet
 
 from .models import (
     Patient,
@@ -20,7 +21,7 @@ from .models import (
     PatientPrescription,
     PatientVisit,
 )
-from .permissions import ROLE_PERMISSIONS, RolePermission
+from .permissions import ROLE_PERMISSIONS
 from .serializers import (
     CompletePatientSerializer,
     PatientAddressSerializer,
@@ -40,11 +41,10 @@ from .serializers import (
 from .services import AppointmentService, OperationService
 
 
-class PatientViewSet(ModelViewSet):
+class PatientViewSet(BasePatientViewSet):
     """ViewSet for Patient model with role-based permissions."""
 
     serializer_class = CompletePatientSerializer
-    permission_classes = [RolePermission]
 
     def get_queryset(self):
         return Patient.objects.select_related(
@@ -53,53 +53,40 @@ class PatientViewSet(ModelViewSet):
             "addresses", "allergies", "chronic_conditions", "medical_reports"
         )
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context["request"] = self.request
-        return context
-
     def get_object(self):
         """Override get_object to use get_object_or_404."""
         queryset = self.get_queryset()
-        obj = get_object_or_404(queryset, id=self.kwargs["pk"])
+        obj = self.get_object_or_404(queryset, id=self.kwargs["pk"])
         self.check_object_permissions(self.request, obj)
         return obj
 
-    @action(detail=True, methods=["patch"])
+    @action(detail=True, methods=["patch"], url_path="update-demographics")
     def update_demographics(self, request, pk=None):
         """Update patient demographics with permission check."""
-        try:
-            patient = self.get_object()
-            user_role = request.user.role
-            permissions = ROLE_PERMISSIONS.get(user_role, {})
+        patient = self.get_object()
+        user_role = request.user.role
+        permissions = ROLE_PERMISSIONS.get(user_role, {})
 
-            if "change" not in permissions.get("patientdemographics", []):
-                return Response(
-                    {"error": "You don't have permission to update demographics"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            if not patient.demographics:
-                return Response(
-                    {"error": "Demographics not found for this patient"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            serializer = PatientDemographicsSerializer(
-                patient.demographics,
-                data=request.data,
-                partial=True,
-                context={"request": request},
-            )
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response(serializer.data)
-        except Patient.DoesNotExist:
-            return Response(
-                {"error": "Patient not found"}, status=status.HTTP_404_NOT_FOUND
+        if "change" not in permissions.get("patientdemographics", []):
+            return self.error_response(
+                message="You don't have permission to update demographics",
+                status_code=status.HTTP_403_FORBIDDEN,
             )
 
-    @action(detail=True, methods=["post"])
+        if not patient.demographics:
+            return self.error_response(
+                message="Demographics not found for this patient",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = PatientDemographicsSerializer(
+            patient.demographics, data=request.data, partial=True, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return self.success_response(data=serializer.data, message="Demographics updated successfully")
+
+    @action(detail=True, methods=["post"], url_path="add-allergy")
     def add_allergy(self, request, pk=None):
         """Add allergy to patient with permission check."""
         patient = self.get_object()
@@ -107,19 +94,17 @@ class PatientViewSet(ModelViewSet):
         permissions = ROLE_PERMISSIONS.get(user_role, {})
 
         if "add" not in permissions.get("patientallergy", []):
-            return Response(
-                {"error": "You don't have permission to add allergies"},
-                status=status.HTTP_403_FORBIDDEN,
+            return self.error_response(
+                message="You don't have permission to add allergies",
+                status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        serializer = PatientAllergySerializer(
-            data=request.data, context={"request": request}
-        )
+        serializer = PatientAllergySerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save(patient=patient)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return self.success_response(data=serializer.data, message="Allergy added successfully")
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="add-chronic-condition")
     def add_chronic_condition(self, request, pk=None):
         """Add chronic condition to patient with permission check."""
         patient = self.get_object()
@@ -127,19 +112,17 @@ class PatientViewSet(ModelViewSet):
         permissions = ROLE_PERMISSIONS.get(user_role, {})
 
         if "add" not in permissions.get("patientchroniccondition", []):
-            return Response(
-                {"error": "You don't have permission to add chronic conditions"},
-                status=status.HTTP_403_FORBIDDEN,
+            return self.error_response(
+                message="You don't have permission to add chronic conditions",
+                status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        serializer = PatientChronicConditionSerializer(
-            data=request.data, context={"request": request}
-        )
+        serializer = PatientChronicConditionSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save(patient=patient)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return self.success_response(data=serializer.data, message="Chronic condition added successfully")
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="update-emergency-contact")
     def update_emergency_contact(self, request, pk=None):
         """Update or create emergency contact with permission check."""
         patient = self.get_object()
@@ -147,9 +130,9 @@ class PatientViewSet(ModelViewSet):
         permissions = ROLE_PERMISSIONS.get(user_role, {})
 
         if "change" not in permissions.get("patientemergencycontact", []):
-            return Response(
-                {"error": "You don't have permission to update emergency contact"},
-                status=status.HTTP_403_FORBIDDEN,
+            return self.error_response(
+                message="You don't have permission to update emergency contact",
+                status_code=status.HTTP_403_FORBIDDEN,
             )
 
         serializer = PatientEmergencyContactSerializer(
@@ -157,13 +140,14 @@ class PatientViewSet(ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save(patient=patient)
-        return Response(serializer.data)
+        return self.success_response(data=serializer.data, message="Emergency contact updated successfully")
 
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
+        """Search patients based on query parameters."""
         query = request.query_params.get("q", "").strip()
         if not query:
-            return Response([])
+            return self.success_response(data=[], message="No query provided")
 
         queryset = self.get_queryset().filter(
             Q(pin__icontains=query)
@@ -173,14 +157,14 @@ class PatientViewSet(ModelViewSet):
             | Q(phone_primary__icontains=query)
         )
         serializer = PatientSearchSerializer(queryset, many=True)
-        return Response(serializer.data)
+        return self.success_response(data=serializer.data, message="Search results retrieved successfully")
 
 
-class PatientDemographicsViewSet(ModelViewSet):
+class PatientDemographicsViewSet(BasePatientViewSet):
     """ViewSet for PatientDemographics model with role-based permissions."""
 
     serializer_class = PatientDemographicsSerializer
-    permission_classes = [RolePermission]
+
 
     def get_queryset(self):
         patient_pk = self.kwargs.get("patient__pk")
@@ -195,11 +179,11 @@ class PatientDemographicsViewSet(ModelViewSet):
         serializer.save(patient=patient)
 
 
-class PatientAddressViewSet(ModelViewSet):
+class PatientAddressViewSet(BasePatientViewSet):
     """ViewSet for PatientAddress model with role-based permissions."""
 
     serializer_class = PatientAddressSerializer
-    permission_classes = [RolePermission]
+
 
     def get_queryset(self):
         return PatientAddress.objects.filter(patient_id=self.kwargs.get("patient__pk"))
@@ -208,11 +192,11 @@ class PatientAddressViewSet(ModelViewSet):
         serializer.save(patient_id=self.kwargs.get("patient__pk"))
 
 
-class PatientAllergyViewSet(ModelViewSet):
+class PatientAllergyViewSet(BasePatientViewSet):
     """ViewSet for PatientAllergy model with role-based permissions."""
 
     serializer_class = PatientAllergySerializer
-    permission_classes = [RolePermission]
+
 
     def get_queryset(self):
         return PatientAllergies.objects.filter(patient_id=self.kwargs.get("patient__pk"))
@@ -221,11 +205,11 @@ class PatientAllergyViewSet(ModelViewSet):
         serializer.save(patient_id=self.kwargs.get("patient__pk"))
 
 
-class PatientChronicConditionViewSet(ModelViewSet):
+class PatientChronicConditionViewSet(BasePatientViewSet):
     """ViewSet for PatientChronicCondition model with role-based permissions."""
 
     serializer_class = PatientChronicConditionSerializer
-    permission_classes = [RolePermission]
+
 
     def get_queryset(self):
         return PatientChronicConditions.objects.filter(
@@ -236,9 +220,9 @@ class PatientChronicConditionViewSet(ModelViewSet):
         serializer.save(patient_id=self.kwargs.get("patient__pk"))
 
 
-class PatientMedicalReportViewSet(ModelViewSet):
+class PatientMedicalReportViewSet(BasePatientViewSet):
     serializer_class = PatientMedicalReportSerializer
-    permission_classes = [RolePermission]
+
     basename = "patientmedicalreport"
 
     def get_queryset(self):
@@ -259,12 +243,11 @@ class PatientMedicalReportViewSet(ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(patient_id=self.kwargs.get("patient__pk"))
 
-class PatientVisitViewSet(ModelViewSet):
+class PatientVisitViewSet(BasePatientViewSet):
     """
     ViewSet for managing patient visits.
     """
 
-    permission_classes = [RolePermission]
     serializer_class = PatientVisitSerializer
     basename = "patientcisit"
 
@@ -277,12 +260,11 @@ class PatientVisitViewSet(ModelViewSet):
         """
         serializer.save(patient_id=self.kwargs.get("patient__pk"))
 
-class PatientOperationViewSet(ModelViewSet):
+class PatientOperationViewSet(BasePatientViewSet):
     """
     ViewSet for managing patient operations.
     """
 
-    permission_classes = [RolePermission]
     serializer_class = PatientOperationSerializer
 
     print("operation view")
@@ -327,12 +309,11 @@ class PatientOperationViewSet(ModelViewSet):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-class PatientDiagnosisViewSet(ModelViewSet):
+class PatientDiagnosisViewSet(BasePatientViewSet):
     """
     ViewSet for managing patient diagnoses.
     """
 
-    permission_classes = [RolePermission]
     serializer_class = PatientDiagnosisSerializer
 
     def get_queryset(self):
@@ -344,8 +325,8 @@ class PatientDiagnosisViewSet(ModelViewSet):
         """
         serializer.save(patient_id=self.kwargs.get("patient__pk"))
 
-class PatientAppointmentViewSet(ModelViewSet):
-    permission_classes = [RolePermission]
+class PatientAppointmentViewSet(BasePatientViewSet):
+
 
     def get_queryset(self):
         patient_id = self.kwargs.get("patient__pk")
@@ -423,7 +404,7 @@ class PatientAppointmentViewSet(ModelViewSet):
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
-class PrescriptionViewSet(ModelViewSet):
+class PrescriptionViewSet(BasePatientViewSet):
     """
     A viewset for managing Prescription instances with optimized querying.
 
@@ -431,7 +412,7 @@ class PrescriptionViewSet(ModelViewSet):
     """
 
     serializer_class = PrescriptionSerializer
-    permission_classes = [RolePermission]
+
 
     def get_queryset(self):
         patient_id = self.kwargs.get("patient_pk")
