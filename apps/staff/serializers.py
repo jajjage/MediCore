@@ -1,4 +1,5 @@
 from django.contrib.auth.models import Permission
+from django.db import transaction
 from rest_framework import serializers
 
 from .models import (
@@ -120,6 +121,8 @@ class StaffRoleSerializer(serializers.ModelSerializer):
                 "Medical staff roles must have medical permissions"
             )
         return data
+    def get_staff_count(self, obj):
+        return obj.get_staff_count()
 class DepartmentMemberSerializer(serializers.ModelSerializer):
     workload = WorkloadAssignmentSerializer(many=True, read_only=True)
     transfers = StaffTransferSerializer(many=True, read_only=True)
@@ -191,16 +194,17 @@ class StaffMemberSerializer(serializers.ModelSerializer):
     current_roles = serializers.SerializerMethodField()
     primary_department = serializers.SerializerMethodField()
     department_memberships = DepartmentMemberSerializer(many=True, read_only=True)
-    staff_profile = serializers.SerializerMethodField()
+    # staff_profile = serializers.SerializerMethodField()
+    doctor_profile = DoctorProfileSerializer(required=False)
 
     class Meta:
         model = StaffMember
         fields = ["id", "email", "hospital", "first_name", "last_name",
                  "full_name", "role", "is_active", "role_permissions",
                  "departments", "current_roles", "primary_department",
-                 "department_memberships", "staff_profile"]
+                 "department_memberships", "doctor_profile"]
         read_only_fields = ["id", "role_permissions", "departments",
-                           "current_roles", "primary_department"]
+                           "current_roles", "primary_department", "doctor_profile"]
 
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
@@ -229,18 +233,18 @@ class StaffMemberSerializer(serializers.ModelSerializer):
             return DepartmentSerializer(primary.department).data
         return None
 
-    def get_staff_profile(self, obj):
-        profile = obj.staff_profile
-        if not profile:
-            return None
+    # def get_staff_profile(self, obj):
+    #     profile = obj.staff_profile
+    #     if not profile:
+    #         return None
 
-        if isinstance(profile, DoctorProfile):
-            return DoctorProfileSerializer(profile).data
-        if isinstance(profile, NurseProfile):
-            return NurseProfileSerializer(profile).data
-        if isinstance(profile, TechnicianProfile):
-            return TechnicianProfileSerializer(profile).data
-        return None
+    #     if isinstance(profile, DoctorProfile):
+    #         return DoctorProfileSerializer(profile).data
+    #     if isinstance(profile, NurseProfile):
+    #         return NurseProfileSerializer(profile).data
+    #     if isinstance(profile, TechnicianProfile):
+    #         return TechnicianProfileSerializer(profile).data
+    #     return None
 
     def validate(self, data):
         # Validate required fields
@@ -251,3 +255,11 @@ class StaffMemberSerializer(serializers.ModelSerializer):
                 "Both first name and last name are required"
             )
         return data
+
+    @transaction.atomic
+    def create(self, validated_data):
+        doctorprofile = validated_data.pop("doctor_profile", {})
+        staff_member = StaffMember.objects.create(**validated_data)
+        DoctorProfile.objects.create(staff_member=staff_member, **doctorprofile)
+
+        return staff_member

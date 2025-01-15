@@ -149,17 +149,18 @@ class StaffMemberViewSet(BaseViewSet):
             return queryset.filter(hospital=user_hospital)
         return queryset.none()
 
-    @transaction.atomic
-    def perform_create(self, serializer):
-        instance = serializer.save()
-        # Create specialized profile based on role
-        role_code = instance.role.code
-        if role_code == "DOCTOR":
-            DoctorProfile.objects.create(staff_member=instance)
-        elif role_code == "NURSE":
-            NurseProfile.objects.create(staff_member=instance)
-        elif role_code == "TECHNICIAN":
-            TechnicianProfile.objects.create(staff_member=instance)
+    # @transaction.atomic
+    # def perform_create(self, serializer):
+    #     doctorprofile = serializer.validated_data.pop("demographics", {})
+    #     instance = serializer.save()
+    #     # Create specialized profile based on role
+    #     role_code = instance.role.code
+    #     if role_code == "DOCTOR":
+    #         DoctorProfile.objects.create(staff_member=instance, **doctorprofile)
+    #     elif role_code == "NURSE":
+    #         NurseProfile.objects.create(staff_member=instance)
+    #     elif role_code == "TECHNICIAN":
+    #         TechnicianProfile.objects.create(staff_member=instance)
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
@@ -201,13 +202,22 @@ class StaffMemberViewSet(BaseViewSet):
 
 class StaffRoleViewSet(BaseViewSet):
     serializer_class = StaffRoleSerializer
-    search_fields = ["name", "code", "description"]
-    ordering_fields = ["name", "category"]
-    filterset_fields = ["category", "is_active"]
+    #Create the filter set later
+    # search_fields = ["name", "code", "description"]
+    # ordering_fields = ["name", "category"]
+    # filterset_fields = ["category", "is_active"]
+
+    queryset = StaffRole.objects.prefetch_related("permissions")
 
     def get_queryset(self):
-        queryset = StaffRole.objects.prefetch_related("permissions")
-        return super().get_queryset().filter(queryset)
+        queryset = super().get_queryset()
+        user = self.request.user
+        user_hospital = getattr(user, "administered_hospital", None) or getattr(user, "associated_hospitals", None)
+        print(user_hospital)
+        if user_hospital:
+            return queryset.filter(is_active=True)
+        return queryset.none()
+
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
@@ -230,16 +240,24 @@ class StaffRoleViewSet(BaseViewSet):
 
 class DepartmentMemberViewSet(BaseViewSet):
     serializer_class = DepartmentMemberSerializer
-    search_fields = ["user__first_name", "user__last_name", "role"]
-    ordering_fields = ["start_date", "created_at"]
-    filterset_fields = ["department", "role", "is_active"]
+     #Create the filter set later
+    # search_fields = ["user__first_name", "user__last_name", "role"]
+    # ordering_fields = ["start_date", "created_at"]
+    # filterset_fields = ["department", "role", "is_active"]
 
-    def get_queryset(self):
-        queryset = DepartmentMember.objects.select_related(
+    queryset = DepartmentMember.objects.select_related(
             "department",
             "user"
         )
-        return super().get_queryset().filter(queryset)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        user_hospital = getattr(user, "administered_hospital", None) or getattr(user, "associated_hospitals", None)
+        print(user_hospital)
+        if user_hospital:
+            return queryset.filter(is_active=True)
+        return queryset.none()
 
     @action(detail=True, methods=["post"])
     @transaction.atomic

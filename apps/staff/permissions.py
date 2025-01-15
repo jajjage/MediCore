@@ -68,11 +68,6 @@ class TenantModelPermission(BasePermission):
 
             # Get hospital profile for this tenant
             hospital_profile = HospitalProfile.objects.get(tenant=tenant)
-            ad = (hasattr(user, "administered_hospital"))
-            asd = (hasattr(user, "associated_hospitals"))
-            print(f"is has hospital staff membership: {user.hospitalstaffmembership_set.exists()}")
-            print(f"is hospital admin: {ad}")
-            print(f"is he a regular staff: {asd}")
 
             # Check if user is either the admin or in additional staff for this specific hospital
             is_admin = (hasattr(user, "administered_hospital") and user.hospitalstaffmembership_set.exists() and

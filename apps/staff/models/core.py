@@ -143,7 +143,7 @@ class StaffMember(AbstractUser, PermissionsMixin):
         """
         try:
             if self.has_role(["DOCTOR"]):
-                return self.doctorprofile
+                return self.doctor_profile
             if self.has_role(["NURSE"]):
                 return self.nurseprofile
             if self.has_role(["TECHNICIAN"]):
