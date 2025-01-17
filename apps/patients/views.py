@@ -7,6 +7,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 
 from apps.patients.base_view.base_patients_view import BasePatientViewSet
+from apps.staff.models import Department, StaffMember
 
 from .models import (
     Patient,
@@ -345,8 +346,16 @@ class PatientAppointmentViewSet(BasePatientViewSet):
         return PatientAppointmentSerializer
 
     def perform_create(self, serializer):
+        physician = serializer.validated_data.pop("physician")
+        department = serializer.validated_data.pop("department")
+
+        physician = StaffMember.objects.get(id=physician)
+        department = Department.objects.get(id=department)
+
         AppointmentService.create_appointment(
             serializer,
+            physician,
+            department,
             self.request.user,
             self.kwargs.get("patient__pk")
         )
