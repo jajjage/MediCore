@@ -64,6 +64,7 @@ class Department(models.Model):
 
     min_staff_per_shift = models.IntegerField(default=0)
     emergency_min_staff = models.IntegerField(default=0)
+    minimum_staff_required = models.IntegerField(default=0)
 
     # Department Details
     description = models.TextField(

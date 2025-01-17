@@ -24,7 +24,7 @@ class StaffTransfer(models.Model):
     reason = models.TextField()
     effective_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
-    approved_by = models.ForeignKey("StaffMember", on_delete=models.PROTECT)
+    approved_by = models.ForeignKey("StaffMember", on_delete=models.PROTECT, null=True)
     required_documents = models.JSONField(default=list)
     handover_checklist = models.JSONField(default=dict)
     notice_period = models.IntegerField(default=30)

@@ -1,3 +1,5 @@
+import logging
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django_filters import rest_framework as django_filters
 from rest_framework import filters, status, viewsets
@@ -12,6 +14,7 @@ from apps.staff.permissions import TenantModelPermission
 from apps.staff.utils.exceptions import BusinessLogicError
 from apps.staff.utils.response_handlers import APIResponse
 
+logger = logging.getLogger(__name__)
 
 class BaseViewSet(viewsets.ModelViewSet, APIResponse):
     permission_classes = [TenantModelPermission]
@@ -57,23 +60,35 @@ class BaseViewSet(viewsets.ModelViewSet, APIResponse):
 
         # Handle any other unexpected errors
         return APIResponse.error(
-            message="An unexpected error occurred",
+            message="eror occur at unexpexted here",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            page = self.paginate_queryset(queryset)
 
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=True)
-        return self.success(
-            data=serializer.data,
-            message=f"Successfully retrieved {self.basename} list"
-        )
+            serializer = self.get_serializer(queryset, many=True)
+            return self.success(
+                data=serializer.data,
+                message=f"Successfully retrieved {self.basename} list"
+            )
+        except (DjangoValidationError, DRFValidationError, BusinessLogicError) as ble:
+            logger.error(f"Business logic error in end_assignment: {ble!s}", exc_info=True)
+            return self.handle_exception(ble)
+        except Exception as e:
+            logger.error(f"Unexpected error in end_assignment: {e!s}", exc_info=True)
+            return APIResponse.error(
+                message="An unexpected error occurred while ending the assignment",
+                error_code="UNEXPECTED_ERROR",
+                status_code=500
+            )
 
     def retrieve(self, request, *args, **kwargs):
         try:

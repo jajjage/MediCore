@@ -128,12 +128,11 @@ class StaffRoleSerializer(serializers.ModelSerializer):
 class DepartmentMemberSerializer(serializers.ModelSerializer):
     workload = WorkloadAssignmentSerializer(many=True, read_only=True)
     transfers = StaffTransferSerializer(many=True, read_only=True)
-    # schedule_conflicts = serializers.SerializerMethodField()
 
     class Meta:
         model = DepartmentMember
         fields = ["id", "department", "user", "role", "start_date", "end_date",
-                 "is_primary", "assignment_type", "time_allocation",
+                 "is_primary", "assignment_type", "time_allocation", "emergency_contact",
                  "schedule_pattern", "workload", "transfers"]
 
     def validate(self, data):
@@ -152,47 +151,41 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
         return data
 
     def _has_schedule_conflict(self, data):
-        # Implementation of schedule conflict checking
-        schedule = data.get("schedule_pattern", {})
+        new_schedule = data.get("schedule_pattern", {})
         existing_schedules = DepartmentMember.objects.filter(
             department=data["department"],
             is_active=True
         ).exclude(id=self.instance.id if self.instance else None)
 
-        # schedule conflict detection logic here
         for existing in existing_schedules:
-            existing_schedule = existing.schedule_pattern
-            # Check for overlapping days and times
-            for day, time_slots in schedule.items():
+            existing_schedule = existing.schedule_pattern or {}
+            for day, new_time_slots in new_schedule.items():
                 if day in existing_schedule:
-                    existing_slots = existing_schedule[day]
-                    # Check for time slot overlaps
-                    for time_slot in time_slots:
-                        start_time = time_slot.get("start")
-                        end_time = time_slot.get("end")
-                    for existing_slot in existing_slots:
-                        existing_start = existing_slot.get("start")
-                        existing_end = existing_slot.get("end")
-                        # Check if time slots overlap
-                        if (start_time < existing_end and end_time > existing_start):
-                            return True
+                    existing_time_slots = existing_schedule[day]
+                    for new_slot in new_time_slots:
+                        new_start = new_slot.get("start")
+                        new_end = new_slot.get("end")
+                        for existing_slot in existing_time_slots:
+                            existing_start = existing_slot.get("start")
+                            existing_end = existing_slot.get("end")
+                            if new_start < existing_end and new_end > existing_start:
+                                return True
         return False
 
     def _check_department_capacity(self, data):
         department = data["department"]
         current_staff = department.staff_members.filter(is_active=True).count()
 
-        # Get department's max capacity (implement this in Department model)
-        max_capacity = department.max_staff_capacity
-        if max_capacity:
-            # Check if adding a new staff member would exceed capacity
-            return current_staff < max_capacity
-        return True
+        # Ensure max_staff_capacity exists and handle None
+        max_capacity = getattr(department, "max_staff_capacity", None)
+        if max_capacity is not None:
+            return current_staff < max_capacity  # Allow if under capacity
+        return True  # No capacity limit means always valid
+
 
 class StaffMemberSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
-    role_permissions = serializers.SerializerMethodField()
-    departments = serializers.SerializerMethodField()
+    # role_permissions = serializers.SerializerMethodField()
     current_roles = serializers.SerializerMethodField()
     role = serializers.CharField()
     password = serializers.CharField(write_only=True, required=False)  # For accepting plain password
@@ -205,10 +198,9 @@ class StaffMemberSerializer(serializers.ModelSerializer):
         model = StaffMember
         fields = [
             "id", "email", "first_name", "last_name", "password",
-            "full_name", "role", "is_active", "role_permissions",
-            "departments", "current_roles", "primary_department",
+            "full_name", "role", "is_active",
+            "current_roles", "primary_department",
             "department_memberships", "doctor_profile", "hashed_password",
-            "department_memberships",
         ]
         read_only_fields = [
             "id", "role_permissions", "departments",
@@ -259,20 +251,13 @@ class StaffMemberSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
 
-    def get_role_permissions(self, obj):
-        return [
-            {
-                "codename": perm.codename,
-                "name": perm.name
-            } for perm in obj.get_role_permissions()
-        ]
-
-    def get_departments(self, obj):
-        return DepartmentSerializer(
-            obj.get_all_departments(),
-            many=True,
-            context=self.context
-        ).data
+    # def get_role_permissions(self, obj):
+    #     return [
+    #         {
+    #             "codename": perm.codename,
+    #             "name": perm.name
+    #         } for perm in obj.get_role_permissions()
+    #     ]
 
     def get_current_roles(self, obj):
         return list(obj.get_current_roles())
@@ -285,37 +270,40 @@ class StaffMemberSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        doctor_profile_data = validated_data.pop("doctor_profile", {})
-        password = validated_data.pop("password", None)
+        try:
+            doctor_profile_data = validated_data.pop("doctor_profile", {})
+            password = validated_data.pop("password", None)
 
-        # Ensure hospital is included in creation
-        hospital = validated_data.get("hospital")
-        if not hospital:
-            request = self.context.get("request")
-            if request and hasattr(request.user, "hospital"):
-                try:
-                    hospital = HospitalProfile.objects.get(tenant=request.user.hospital)
-                    validated_data["hospital"] = hospital
-                except HospitalProfile.DoesNotExist as e:
-                    raise (f"Failed to get hospital profile in create method; {(e)}") from e
+            # Ensure hospital is included in creation
+            hospital = validated_data.get("hospital")
+            if not hospital:
+                request = self.context.get("request")
+                if request and hasattr(request.user, "hospital"):
+                    try:
+                        hospital = HospitalProfile.objects.get(tenant=request.user.hospital)
+                        validated_data["hospital"] = hospital
+                    except HospitalProfile.DoesNotExist as e:
+                        raise (f"Failed to get hospital profile in create method; {(e)}") from e
 
-        # Create the staff member with explicit hospital assignment
-        staff_member = StaffMember.objects.create(
-            hospital=validated_data.pop("hospital"),
-            **validated_data
-        )
-
-        if password:
-            staff_member.set_password(password)
-            staff_member.save()
-
-        # Create doctor profile if data is provided
-        if doctor_profile_data:
-            DoctorProfile.objects.create(
-                staff_member=staff_member,
-                **doctor_profile_data
+            # Create the staff member with explicit hospital assignment
+            staff_member = StaffMember.objects.create(
+                hospital=validated_data.pop("hospital"),
+                **validated_data
             )
-        return staff_member
+
+            if password:
+                staff_member.set_password(password)
+                staff_member.save()
+
+            # Create doctor profile if data is provided
+            if doctor_profile_data:
+                DoctorProfile.objects.create(
+                    staff_member=staff_member,
+                    **doctor_profile_data
+                )
+            return staff_member
+        except Exception as e:
+           raise (f"Error creating staff member: {e!s}") from e
 
     @transaction.atomic
     def update(self, instance, validated_data):

@@ -23,7 +23,7 @@ class WorkloadAssignmentFilter(filters.FilterSet):
         fields = ["department_member", "week_start_date"]
 
 class StaffTransferFilter(filters.FilterSet):
-    transfer_type = filters.ChoiceFilter(choices=[
+    transfer_type = filters.TypedChoiceFilter(choices=[
         ("PERMANENT", "Permanent Transfer"),
         ("TEMPORARY", "Temporary Cover"),
         ("ROTATION", "Rotation"),

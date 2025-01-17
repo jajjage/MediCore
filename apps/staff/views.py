@@ -1,10 +1,15 @@
+import logging
+
 from django.db import transaction
 from django.db.models import Sum
 from django.utils.timezone import now
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+
+from hospital.models import HospitalProfile
 
 from .base.staff_base_viewset import BaseViewSet
 from .models import (
@@ -29,6 +34,7 @@ from .serializers import (
     TechnicianProfileSerializer,
     WorkloadAssignmentSerializer,
 )
+from .utils.date_validators import date_validation
 from .utils.exceptions import BusinessLogicError
 from .utils.filters import (
     DepartmentFilter,
@@ -41,7 +47,7 @@ from .utils.filters import (
 )
 from .utils.response_handlers import APIResponse
 
-
+logger = logging.getLogger(__name__)
 class DepartmentViewSet(BaseViewSet):
     serializer_class = DepartmentSerializer
     filterset_class = DepartmentFilter
@@ -62,53 +68,93 @@ class DepartmentViewSet(BaseViewSet):
             OpenApiParameter(name="active_only", type=bool, description="Filter only active staff")
         ]
     )
+
     @action(detail=True, methods=["get"])
     def staff_list(self, request, pk=None):
         """Get list of staff members in department."""
         try:
             department = self.get_object()
-            active_only = request.query_params.get("active_only", "true").lower() == "true"
+            # Get and parse active_only parameter
+            active_only_param = request.query_params.get("active_only", "true").strip('"')
+            # Convert to boolean more reliably
+            active_only = active_only_param.lower() in ["true", "1", "yes", "on"]
 
-            staff = department.staff_members.filter(is_active=active_only)
-            serializer = StaffMemberSerializer(staff, many=True, context={"request": request})
+            # Get department members through the correct relationship
+            department_members = department.staff_members.select_related("user")
+
+            if active_only:
+                department_members = department_members.filter(user__is_active=True)
+
+            # Extract the StaffMember objects
+            staff = [member.user for member in department_members]
+
+            logger.info(f"Found {len(staff)} staff members")
+            serializer = StaffMemberSerializer(
+                staff,
+                many=True,
+                context={"request": request}
+            )
 
             return APIResponse.success(
                 data=serializer.data,
                 message="Successfully retrieved department staff list",
                 extra={
-                    "total_count": staff.count(),
+                    "total_count": len(staff),
                     "department_name": department.name,
-                    "active_only": active_only
+                    "active_only": active_only,
                 }
             )
         except Exception as e:
             return self.handle_exception(e)
 
     @transaction.atomic
-    def perform_create(self, serializer):
+    def create(self, request, *args, **kwargs):  # Fixed argument spelling
+        user = request.user
         try:
-            hospital = self.get_hospital_from_user()
-            if not hospital:
-                raise BusinessLogicError(
-                    message="No hospital associated with current user",
-                    error_code="NO_HOSPITAL_ACCESS"
-                )
+            # Get hospital profile
+            try:
+                hospital_profile = HospitalProfile.objects.get(tenant=user.hospital)
+            except HospitalProfile.DoesNotExist as e:
+                return self.handle_exception(e)
 
-            instance = serializer.save(hospital=hospital)
+            # Get department head
+            department_head_id = request.data.get("department_head")
+            if department_head_id:
+                try:
+                    department_head = StaffMember.objects.get(id=department_head_id)
+                    logger.info(f"Found department head: {department_head}")
+                except StaffMember.DoesNotExist as e:
+                    return self.handle_exception(e)
+            else:
+                department_head = None
 
-            if instance.department_head:
+            # Validate and save department
+            serializer = self.get_serializer(data=request.data)
+            if not serializer.is_valid():
+                return APIResponse.validation_error(serializer.errors)
+
+            # Save department
+            instance = serializer.save(hospital=hospital_profile)
+
+            # Create department head assignment if provided
+            if department_head:
                 DepartmentMember.objects.create(
                     department=instance,
-                    user=instance.department_head,
+                    user=department_head,
                     role="HEAD",
                     start_date=now(),
-                    is_primary=True
+                    is_primary=True,
+                    schedule_pattern={"none":[]},
+                    emergency_contact="000000",
+                    time_allocation=100.0  # Added required field
                 )
+
             return APIResponse.success(
                 data=self.get_serializer(instance).data,
                 message="Department created successfully",
                 status_code=status.HTTP_201_CREATED
             )
+
         except Exception as e:
             return self.handle_exception(e)
 
@@ -151,6 +197,7 @@ class StaffMemberViewSet(BaseViewSet):
             return self.handle_exception(e)
 
     @action(detail=True, methods=["get"])
+    @transaction.atomic
     def schedule(self, request, pk=None):
         """Get staff member's schedule."""
         try:
@@ -271,58 +318,131 @@ class DepartmentMemberViewSet(BaseViewSet):
     serializer_class = DepartmentMemberSerializer
     queryset = DepartmentMember.objects.select_related("department", "user")
 
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        try:
+            try:
+                department = Department.objects.get(id=request.data.get("department"))
+                logger.info(f"Found department: {department}")
+            except Department.DoesNotExist as e:
+                return self.handle_exception(e)
+
+            # Validate the user exists
+            try:
+                StaffMember.objects.get(id=request.data.get("user"))
+            except StaffMember.DoesNotExist as e:
+                return self.handle_exception(e)
+
+            serializer = self.get_serializer(data=request.data)
+
+            # Validate serializer data with detailed error logging
+            if not serializer.is_valid():
+                return Response(
+                    serializer.errors,
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Attempt to save with exception handling
+            try:
+                serializer.save()
+                return self.success(
+                    data=serializer.data,
+                    message=f"Successfully created {self.basename}",
+                    status_code=status.HTTP_201_CREATED
+                )
+            except Exception as e:
+                return self.handle_exception(e)
+
+        except Exception as e:
+           logger.exception(f"Unexpected error in end_assignment: {e!s}")
+           return self.handle_exception(e)
+
+
+    @action(detail=True, methods=["get"])
+    def workload_analysis(self, request, pk=None):
+        """Get detailed workload analysis for staff member."""
+        member = self.get_object()
+        workload = DepartmentMember.get_staff_workload(member.user)
+        return APIResponse.success(data=workload)
+
+
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def end_assignment(self, request, pk=None):
-        """End a department assignment with proper checks and workflows."""
+        """End a department assignment."""
         try:
+            data = request.data
             assignment = self.get_object()
-            end_date = request.data.get("end_date")
 
-            if not end_date:
+            end_date = date_validation(data)
+            # Check staffing requirements
+            requirements = assignment.check_staffing_requirements()
+            print(requirements["current_staff_count"])
+            if requirements["requires_replacement"] and not data.get("transfer_to_department"):
                 raise BusinessLogicError(
-                    message="End date is required",
-                    error_code="END_DATE_REQUIRED"
+                    "Immediate replacement required for this role",
+                    "REPLACEMENT_REQUIRED"
                 )
 
-            department = assignment.department
-            future_staff_count = department.get_active_staff().filter(
-                end_date__gt=end_date
-            ).count()
-
-            if future_staff_count < department.minimum_staff_required:
+            if not requirements["does_minimum_staff_met"]:
                 raise BusinessLogicError(
-                    message="Cannot end assignment - minimum staffing levels not maintained",
-                    error_code="MIN_STAFF_VIOLATION"
+                    f"Cannot end assignment - minimum staffing levels not maintained "
+                    f"(Current: {requirements['current_staff_count']}, "
+                    f"Required: {requirements['minimum_required']})",
+                    "MIN_STAFF_VIOLATION"
                 )
 
-            transfer_to = request.data.get("transfer_to_department")
-            if transfer_to:
-                transfer = assignment.initiate_transfer(
-                    to_department=transfer_to,
-                    transfer_type="PERMANENT",
-                    effective_date=end_date,
-                    reason=request.data.get("reason")
-                )
-                extra_data = {"transfer_id": transfer.id}
-            else:
-                assignment.end_date = end_date
-                assignment.is_active = False
-                assignment.full_clean()
-                assignment.save()
-                extra_data = {}
+            # Handle transfer if specified
+            if data.get("transfer_to_department"):
+                # Create a separate view action for transfers
+                return self.transfer_assignment(request, assignment, end_date)
+
+            # End the assignment
+            assignment.end_assignment(end_date, data.get("reason"))
 
             return APIResponse.success(
                 data=self.get_serializer(assignment).data,
                 message="Assignment ended successfully",
                 extra={
                     "staff_name": assignment.user.get_full_name(),
-                    "department_name": department.name,
-                    **extra_data
+                    "department_name": assignment.department.name,
+                    "staffing_requirements": requirements
                 }
             )
+
+        except BusinessLogicError as e:
+            return APIResponse.error(message=str(e), error_code=e.error_code)
+        except ValidationError as e:
+            return APIResponse.error(message=str(e), error_code="VALIDATION_ERROR")
         except Exception as e:
-            return self.handle_exception(e)
+            logger.exception(f"Unexpected error in end_assignment: {e!s}")
+            return APIResponse.error(
+                message="An unexpected error occurred",
+                error_code="INTERNAL_SERVER_ERROR",
+                status_code=500
+            )
+
+    def transfer_assignment(self, request, assignment, effective_date):
+        """Handle transfer of assignment to new department."""
+        try:
+            transfer = assignment.initiate_transfer(
+                to_department=request.data["transfer_to_department"],
+                transfer_type=request.data.get("transfer_type", "PERMANENT"),
+                effective_date=effective_date,
+                reason=request.data.get("reason")
+            )
+
+            return APIResponse.success(
+                data=self.get_serializer(assignment).data,
+                message="Assignment transfer initiated successfully",
+                extra={
+                    "staff_name": assignment.user.get_full_name(),
+                    "department_name": assignment.department.name,
+                    "transfer_id": transfer.id
+                }
+            )
+        except BusinessLogicError as e:
+            return APIResponse.error(message=str(e), error_code=e.error_code)
 
 class WorkloadAssignmentViewSet(BaseViewSet):
     serializer_class = WorkloadAssignmentSerializer
@@ -400,5 +520,8 @@ class StaffTransferViewSet(BaseViewSet):
                     "effective_date": transfer.effective_date
                 }
             )
+        except BusinessLogicError as ble:
+            return self.handle_exception(ble)
         except Exception as e:
+            logger.exception(f"Business logic error in end_assignment: {e!s}")
             return self.handle_exception(e)

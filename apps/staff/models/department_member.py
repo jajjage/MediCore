@@ -1,9 +1,15 @@
 import uuid
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
+from django.db.models import Q, Sum
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+from apps.staff.utils.exceptions import BusinessLogicError
+from apps.staff.utils.validators import validate_schedule_pattern
 
 from .departments import Department
 from .staff_transfer import StaffTransfer
@@ -73,12 +79,13 @@ class DepartmentMember(models.Model):
         max_digits=5,
         decimal_places=2,
         help_text="Percentage of time allocated to this department",
-        validators=[MinValueValidator(0), MaxValueValidator(100)]
+        validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))]
     )
 
     schedule_pattern = models.JSONField(
         default=dict,
-        help_text="Weekly/monthly schedule pattern"
+        help_text="Weekly/monthly schedule pattern",
+        validators=[validate_schedule_pattern]
     )
 
     # Meta
@@ -107,7 +114,7 @@ class DepartmentMember(models.Model):
         indexes = [
             models.Index(fields=["user", "department", "is_active"]),
             models.Index(fields=["role", "is_active"]),
-            models.Index(fields=["start_date", "end_date"]),
+            models.Index(fields=["start_date", "end_date", "time_allocation"]),
         ]
         ordering = ["-start_date"]
         verbose_name = _("Department Member")
@@ -122,65 +129,202 @@ class DepartmentMember(models.Model):
 
     def clean(self):
         super().clean()
-        # Validate dates
+        if not hasattr(self, "_loaded_values"):
+            return
+
+        self._validate_dates()
+        self._validate_hospital()
+        self._validate_role_changes()
+        self._validate_overlapping_assignments()
+        self._validate_workload()
+
+    def _validate_dates(self):
         if self.end_date and self.end_date <= self.start_date:
             raise ValidationError({
                 "end_date": "End date must be after start date"
             })
 
-        # Validate same hospital
-        if self.user_id and self.department_id:  # Check if both fields are set
-            user_hospital = self.user.hospital_id
-            department_hospital = self.department.hospital_id
+        # Validate against existing assignments
+        overlapping = DepartmentMember.objects.filter(
+            user=self.user,
+            department=self.department,
+            role=self.role
+        ).exclude(pk=self.pk).filter(
+            Q(start_date__lte=self.start_date, end_date__gte=self.start_date) |
+            Q(start_date__lte=self.end_date, end_date__gte=self.end_date) if self.end_date else Q()
+        )
 
-            if user_hospital != department_hospital:
-                raise ValidationError({
-                    "user": "User must belong to the same hospital as the department",
-                    "department": "Department must belong to the same hospital as the user"
-                })
-    def assign_schedule(self, schedule_data, start_date, end_date):
-        """
-        Assign working schedule for the staff member.
-        """
-        self.schedule_pattern = {
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat(),
-            "pattern": schedule_data
-        }
-        self.save()
+        if overlapping.exists():
+            raise ValidationError("Overlapping assignment period detected")
+
+    def _validate_role_changes(self):
+        if not self.pk:
+            return
+
+        old_role = self._loaded_values.get("role")
+        if old_role and old_role != self.role:
+            # Check if role change is allowed
+            if self.transfer_in_progress():
+                raise ValidationError("Cannot change role during transfer")
+
+            # Validate department head changes
+            if old_role == "HEAD" or self.role == "HEAD":
+                self._validate_head_role_change()
+
+    def _validate_head_role_change(self):
+        if self.role == "HEAD":
+            existing_head = DepartmentMember.objects.filter(
+                department=self.department,
+                role="HEAD",
+                is_active=True
+            ).exclude(pk=self.pk).exists()
+
+            if existing_head:
+                raise ValidationError("Department already has an active head")
+
+    def _validate_workload(self):
+        if not self.is_active:
+            return
+
+        # Calculate total time allocation
+        total_allocation = DepartmentMember.objects.filter(
+            user=self.user,
+            is_active=True
+        ).exclude(pk=self.pk).aggregate(
+            total=Sum("time_allocation")
+        )["total"] or 0
+
+        if (total_allocation + self.time_allocation) > 100:  # noqa: PLR2004
+            raise ValidationError({
+                "time_allocation": f"Total time allocation would exceed 100% ({total_allocation + self.time_allocation}%)"
+            })
 
     def initiate_transfer(self, to_department, transfer_type, effective_date, **kwargs):
+        """Enhanced transfer initiation with additional checks and workflows."""
         with transaction.atomic():
-            # Create new department assignment
+            # Validate minimum staffing levels
+            self._validate_staffing_levels(effective_date)
+
+            # Validate transfer eligibility
+            # self._validate_transfer_eligibility(to_department, effective_date)
+
+            # Create new assignment with proper attribute inheritance
             new_assignment = DepartmentMember.objects.create(
                 user=self.user,
                 department=to_department,
-                role=self.role,
+                role=kwargs.get("new_role", self.role),
                 start_date=effective_date,
                 assignment_type="TRANSFER",
-                time_allocation=kwargs.get("time_allocation", 100)
+                time_allocation=kwargs.get("time_allocation", self.time_allocation),
+                schedule_pattern=kwargs.get("schedule_pattern", self.schedule_pattern),
+                max_weekly_hours=kwargs.get("max_weekly_hours", self.max_weekly_hours),
+                rest_period_hours=self.rest_period_hours,
+                is_emergency_response=self.is_emergency_response,
+                is_primary=self.is_primary
             )
 
-            # Create transfer record
+            # Create transfer record with enhanced tracking
             transfer = StaffTransfer.objects.create(
                 from_assignment=self,
                 to_assignment=new_assignment,
                 transfer_type=transfer_type,
                 effective_date=effective_date,
+                notice_period=kwargs.get("notice_period", 30),
+                required_documents=kwargs.get("required_documents", []),
+                handover_checklist=self._generate_handover_checklist(to_department),
+                approved_by = None,
                 **kwargs
             )
 
-            # Handle primary department changes
+            # Update current assignment
             if self.is_primary:
                 self.is_primary = False
                 new_assignment.is_primary = True
 
-            # Update end date for current assignment
-            self.end_date = effective_date
-            self.is_active = False
             self.save()
 
             return transfer
+
+    def _validate_staffing_levels(self, effective_date):
+        """Validate department staffing levels post-transfer."""
+        department = self.department
+        future_staff_count = department.get_active_staff().filter(
+            Q(end_date__isnull=True) |
+            Q(end_date__gt=effective_date)
+        ).count()
+
+        if future_staff_count < department.minimum_staff_required:
+            raise ValidationError(
+                f"Transfer would violate minimum staffing requirement "
+                f"({future_staff_count} vs {department.minimum_staff_required} required)"
+            )
+
+    def _generate_handover_checklist(self, to_department):
+        """Generate role-specific handover checklist."""
+        base_checklist = {
+            "equipment_returned": False,
+            "access_cards_updated": False,
+            "system_access_updated": False,
+            "documents_transferred": False,
+        }
+
+        role_specific = {
+            "HEAD": {
+                "leadership_handover": False,
+                "department_reports": False,
+                "ongoing_projects": False,
+            },
+            "DOCTOR": {
+                "patient_handover": False,
+                "prescriptions_review": False,
+            },
+            "NURSE": {
+                "patient_care_notes": False,
+                "medication_schedules": False,
+            }
+        }
+
+        checklist = base_checklist.copy()
+        checklist.update(role_specific.get(self.role, {}))
+        return checklist
+
+
+    @property
+    def requires_immediate_replacement(self):
+        """Check if role requires immediate replacement."""
+        return self.role in ["HEAD", "DOCTOR"] and self.is_primary
+
+    def get_coverage_requirements(self):
+        """Get coverage requirements based on role and assignment type."""
+        return {
+            "immediate_replacement_needed": self.requires_immediate_replacement,
+            "minimum_notice_period": self.notice_period,
+            "special_requirements": self._get_special_requirements(),
+        }
+
+    def check_staffing_requirements(self):
+        """
+        Check if ending this assignment would violate staffing requirements.
+        """
+        requires_replacement = self.role in ["HEAD", "DOCTOR"] and self.is_primary
+        future_staff_count = self.department.get_active_staff().filter(
+            end_date__gt=timezone.now().date()
+        ).count()
+
+        return {
+            "requires_replacement": requires_replacement,
+            "does_minimum_staff_met": future_staff_count >= self.department.minimum_staff_required,
+            "current_staff_count": future_staff_count,
+            "minimum_required": self.department.minimum_staff_required
+        }
+
+    def _get_special_requirements(self):
+        requirements = []
+        if self.is_emergency_response:
+            requirements.append("Emergency response capability required")
+        if self.role == "HEAD":
+            requirements.append("Leadership experience required")
+        return requirements
 
     @classmethod
     def from_db(cls, db, field_names, values):
@@ -195,3 +339,52 @@ class DepartmentMember(models.Model):
             user=self.user,
             department=self.department
         ).order_by("-start_date")
+
+    @classmethod
+    def get_staff_workload(cls, staff_member, date=None):  # noqa: ARG003
+        """Get detailed workload analysis for a staff member."""
+        assignments = cls.objects.filter(
+            user=staff_member,
+            is_active=True
+        ).select_related("department")
+
+        return {
+            "total_allocation": sum(a.time_allocation for a in assignments),
+            "departments": [
+                {
+                    "department": a.department.name,
+                    "role": a.get_role_display(),
+                    "allocation": a.time_allocation,
+                    "schedule": a.schedule_pattern
+                } for a in assignments
+            ],
+            "weekly_hours": sum(a.max_weekly_hours for a in assignments)
+        }
+
+    def deactivate(self):
+        """Deactivate this assignment."""
+        self.is_active = False
+        self.end_date = timezone.now()
+        self.save()
+
+    def reactivate(self):
+        """Reactivate this assignment."""
+        self.clean()  # This will raise an error if user has another active assignment
+        self.is_active = True
+        self.end_date = None
+        self.save()
+
+    def end_assignment(self, end_date, reason=None):
+        """
+        End this department member's assignment.
+        """
+        if self.end_date and self.end_date <= timezone.now().date():
+            raise BusinessLogicError("Assignment already ended", "ALREADY_ENDED")
+
+        if end_date < timezone.now().date():
+            raise BusinessLogicError("End date cannot be in the past", "INVALID_END_DATE")
+
+        self.end_date = end_date
+        self.is_active = False
+        self.full_clean()
+        self.save()
