@@ -4,11 +4,13 @@ from django.db import transaction
 class AppointmentService:
     @staticmethod
     @transaction.atomic
-    def create_appointment(serializer, user, patient_id):
+    def create_appointment(serializer, physician, department, user, patient_id):
         """
         Create a new appointment.
         """
         return serializer.save(
+            physician=physician,
+            department=department,
             created_by=user,
             modified_by=user,
             patient_id=patient_id
