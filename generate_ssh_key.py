@@ -44,4 +44,4 @@ public_key_path = ssh_dir / "id_ed25519.pub"
 with public_key_path.open("w") as public_file:
     public_file.write(public_pem_with_comment)
 
-print(f"ED25519 SSH keys generated and saved to {ssh_dir}.")  # noqa: T201
+print(f"ED25519 SSH keys generated and saved to {ssh_dir}.")
