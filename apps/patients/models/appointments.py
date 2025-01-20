@@ -1,6 +1,8 @@
 import uuid
+from datetime import datetime
 
 from django.db import models
+from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from .core import Patient
@@ -65,13 +67,84 @@ class PatientAppointment(models.Model):
             models.Index(fields=["status", "appointment_date"]),
         ]
         constraints = [
-            models.CheckConstraint(check=models.Q(end_time__gt=models.F("start_time")), name="valid_time_range"),
-            models.UniqueConstraint(
-                fields=["physician", "start_time"],
-                name="unique_appointment_per_doctor_start_time"
-            ),
+            models.CheckConstraint(check=models.Q(end_time__gt=models.F("start_time")), name="valid_time_range")
         ]
 
 
     def __str__(self):
         return f"Appointment on {self.appointment_date} at {self.appointment_time} for {self.patient}"
+
+
+    @classmethod
+    def can_create_appointment(cls, patient_id, appointment_date, appointment_time):
+        """
+        Validate if a new appointment can be created for a patient.
+
+        Args:
+            patient_id: ID of the patient.
+            appointment_date: Date of proposed appointment
+            appointment_time: Time of proposed appointment
+
+        Returns:
+            dict: {'allowed': boolean, 'message': string}
+
+        """
+        try:
+            # Convert strings to proper date/time objects if needed
+            if isinstance(appointment_date, str):
+                appointment_date = datetime.strptime(appointment_date, "%Y-%m-%d%z").date()
+            if isinstance(appointment_time, str):
+                appointment_time = datetime.strptime(appointment_time, "%H:%M%z").time()
+
+            # Create datetime for comparison
+            proposed_datetime = timezone.datetime.combine(
+                appointment_date,
+                appointment_time,
+                tzinfo=timezone.get_current_timezone()
+            )
+
+            # Check if appointment is in the past
+            if proposed_datetime < timezone.now():
+                return {
+                    "allowed": False,
+                    "message": "Cannot create appointments in the past"
+                }
+
+            # Check for existing active appointments
+            existing_appointments = cls.objects.filter(
+                patient_id=patient_id,
+                status__in=["pending", "approved"],
+                appointment_date__gte=timezone.now().date()
+            )
+
+            if existing_appointments.exists():
+                # Get details of existing appointments for error message
+                active_appointments = []
+                for apt in existing_appointments:
+                    apt_datetime = timezone.datetime.combine(
+                        apt.appointment_date,
+                        apt.appointment_time,
+                        tzinfo=timezone.get_current_timezone()
+                    )
+                    if apt_datetime >= timezone.now():
+                        active_appointments.append(
+                            f"{apt.appointment_date} at {apt.appointment_time}"
+                        )
+
+                if active_appointments:
+                    return {
+                        "allowed": False,
+                        "message": (
+                            "Patient has existing active appointments on: "
+                            f"{', '.join(active_appointments)}. "
+                            "Please cancel existing appointments before creating a new one."
+                        )
+                    }
+
+            return {"allowed": True, "message": "Appointment can be created"}
+
+        except (ValueError, TypeError) as e:
+            return {
+                "allowed": False,
+                "message": f"Validation error: {e!s}"
+            }

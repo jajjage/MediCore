@@ -133,7 +133,7 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
         model = DepartmentMember
         fields = ["id", "department", "user", "role", "start_date", "end_date",
                  "is_primary", "assignment_type", "time_allocation", "emergency_contact",
-                 "schedule_pattern", "workload", "transfers"]
+                 "schedule_pattern", "workload", "transfers", "is_active"]
 
     def validate(self, data):
         # Validate schedule conflicts

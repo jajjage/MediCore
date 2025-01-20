@@ -80,10 +80,10 @@ class BaseViewSet(viewsets.ModelViewSet, APIResponse):
                 message=f"Successfully retrieved {self.basename} list"
             )
         except (DjangoValidationError, DRFValidationError, BusinessLogicError) as ble:
-            logger.error(f"Business logic error in end_assignment: {ble!s}", exc_info=True)
+            logger.exception(f"Business logic error in end_assignment: {ble!s}")
             return self.handle_exception(ble)
         except Exception as e:
-            logger.error(f"Unexpected error in end_assignment: {e!s}", exc_info=True)
+            logger.exception(f"Unexpected error in end_assignment: {e!s}")
             return APIResponse.error(
                 message="An unexpected error occurred while ending the assignment",
                 error_code="UNEXPECTED_ERROR",

@@ -57,7 +57,7 @@ def check_model_permissions(serializer, data, is_update):
 
     return data
 
-def prescription_preiod( data):
+def prescription_period( data):
     """
     Perform custom validation.
     """

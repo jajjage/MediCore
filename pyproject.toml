@@ -129,6 +129,7 @@ ignore = [
     "RET506",   #
     "TRY300",   #
     "B904",     #
+    "DTZ007",   # Date time zone
 ]
 
 [tool.ruff.lint.per-file-ignores]

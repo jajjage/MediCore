@@ -125,20 +125,44 @@ class DepartmentMember(models.Model):
 
     def save(self, *args, **kwargs):
         self.full_clean()
+
         super().save(*args, **kwargs)
 
     def clean(self):
         super().clean()
         if not hasattr(self, "_loaded_values"):
+            print("the else")
             return
-
+        print("clean get called")
         self._validate_dates()
         self._validate_hospital()
         self._validate_role_changes()
-        self._validate_overlapping_assignments()
         self._validate_workload()
+        self._validate_overlapping_assignments()
+
+
+    def _validate_overlapping_assignments(self):
+        print("_validate_overlapping_assignments")
+        if self.is_active:
+            active_assignments = DepartmentMember.objects.filter(
+                user=self.user,
+                is_active=True
+            )
+            if self.pk:
+                active_assignments = active_assignments.exclude(pk=self.pk)
+            if active_assignments.exists():
+                raise ValidationError(
+                    _("Staff member already has an active department assignment")
+                )
+
+    def _validate_hospital(self):
+        print("_validate_hospital")
+        if self.user_id and self.department_id and self.user.hospital_id != self.department.hospital_id:
+            raise ValidationError("User and department must belong to the same hospital")
+
 
     def _validate_dates(self):
+        print("_validate_dates")
         if self.end_date and self.end_date <= self.start_date:
             raise ValidationError({
                 "end_date": "End date must be after start date"
@@ -158,20 +182,29 @@ class DepartmentMember(models.Model):
             raise ValidationError("Overlapping assignment period detected")
 
     def _validate_role_changes(self):
+        print(dir(self))
         if not self.pk:
             return
+        if self.role:
+            active_role = DepartmentMember.objects.filter(
+                    user=self.user,
+                    is_active=True
+                )
+            if self.pk:
+                active_role = active_role.exclude(pk=self.pk)
+                old_role = active_role.role
+                print(f"_validate_role_changes {old_role}")
+                if old_role and old_role != self.role:
+                    # Check if role change is allowed
+                    if self.transfer_in_progress():
+                        raise ValidationError("Cannot change role during transfer")
 
-        old_role = self._loaded_values.get("role")
-        if old_role and old_role != self.role:
-            # Check if role change is allowed
-            if self.transfer_in_progress():
-                raise ValidationError("Cannot change role during transfer")
-
-            # Validate department head changes
-            if old_role == "HEAD" or self.role == "HEAD":
-                self._validate_head_role_change()
+                    # Validate department head changes
+                    if old_role == "HEAD" or self.role == "HEAD":
+                        self._validate_head_role_change()
 
     def _validate_head_role_change(self):
+        print("_validate_head_role_change")
         if self.role == "HEAD":
             existing_head = DepartmentMember.objects.filter(
                 department=self.department,
@@ -183,6 +216,7 @@ class DepartmentMember(models.Model):
                 raise ValidationError("Department already has an active head")
 
     def _validate_workload(self):
+        print("_validate_workload")
         if not self.is_active:
             return
 
@@ -388,3 +422,13 @@ class DepartmentMember(models.Model):
         self.is_active = False
         self.full_clean()
         self.save()
+
+    def get_schedule_pattern(self, user_id):
+        """Get the schedule pattern for this assignment."""
+        if not isinstance(user_id, (str, uuid.UUID)):
+            raise TypeError("user_id must be a string or UUID")
+
+        if str(self.user.id) != str(user_id):
+            raise ValidationError("Schedule can only be accessed by assigned user")
+
+        return self.schedule_pattern

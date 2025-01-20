@@ -120,6 +120,7 @@ class RolePermission(BasePermission):
         normalized_resource = "".join(word for word in resource_.split())
         action = view.action
         print(f"Action received: {action}")
+        print(normalized_resource)
 
 
         # Map DRF actions to permissions
@@ -131,17 +132,19 @@ class RolePermission(BasePermission):
             "partial_update": "change",
             "destroy": "delete",
             "search": "view",
+            "update_emergency_contact": "add",
             # Add any custom actions here
             "cancel": "change",
             "reschedule": "change",
-            "approve": "change",
-            "reject": "change",
+            "update_status": "change",
+            "available_slots": "view",
+            "check_availability": "add",
+            "create_recurring": "add"
         }
         permission = action_to_permission.get(action)
         print(f"Resolved permission for action '{action}': {permission}")
 
         if not permission:
-            print("false")
             return False
         cache_key = f"user_role_permissions_{user_role}"
         # Check cache first
@@ -152,11 +155,6 @@ class RolePermission(BasePermission):
             raise ValueError(
                 f"No StaffRole found with code: normalize_role: {user_role}"
             ) from err
-        permissions_queryset = role.permissions.all()
-            # Convert to desired structure
-        permissions_dict = convert_queryset_to_role_permissions(
-                permissions_queryset
-            )
         if permissions is None:
             permissions_queryset = role.permissions.all()
             # Convert to desired structure
@@ -168,7 +166,7 @@ class RolePermission(BasePermission):
             permissions = permissions_dict
 
         # Check if the user's role has the required permission
-        model_permissions = permissions_dict.get(normalized_resource, [])
+        model_permissions = permissions.get(normalized_resource, [])
         if not model_permissions:
             allowed_permissions = ROLE_PERMISSIONS.get(user_role, {}).get(
                 "permissions", {}

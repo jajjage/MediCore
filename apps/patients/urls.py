@@ -11,9 +11,9 @@ from .views import (
     PatientDiagnosisViewSet,
     PatientMedicalReportViewSet,
     PatientOperationViewSet,
+    PatientPrescriptionViewSet,
     PatientViewSet,
     PatientVisitViewSet,
-    PrescriptionViewSet,
 )
 
 # Parent router for patients
@@ -71,7 +71,7 @@ diagnosis_router.register(
 )
 prescription_router = routers.NestedSimpleRouter(router, r"patients", lookup="patient")
 prescription_router.register(
-    r"prescriptions", PrescriptionViewSet, basename="patient-prescription"
+    r"prescriptions", PatientPrescriptionViewSet, basename="patient-prescription"
 )
 
 
