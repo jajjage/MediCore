@@ -4,7 +4,7 @@ from django.dispatch import receiver
 from core.models import MyUser, TenantMembership
 
 
-@receiver([post_save, m2m_changed], sender=TenantMembership)
+@receiver([post_save, m2m_changed, post_delete], sender=TenantMembership)
 def clear_membership_cache(sender, instance, **kwargs):
     instance.user.clear_permission_cache()
 

@@ -86,6 +86,12 @@ class HospitalProfile(models.Model):
     def clean(self):
         super().clean()
 
+        if self.admin_user and not self.admin_user.tenant_memberships.filter(
+            tenant=self.tenant,
+            role="ADMIN"
+        ).exists():
+            raise ValidationError("Admin user must have ADMIN role for this hospital")
+
         if (
             HospitalProfile.objects.filter(license_number=self.license_number)
             .exclude(pk=self.pk)
@@ -95,7 +101,7 @@ class HospitalProfile(models.Model):
                 {"license_number": "This license number is already registered."}
             )
     @transaction.atomic
-    def add_staff_member(self, user):
+    def add_staff_member(self, user, role="STAFF"):
         """
         Add a staff member to the hospital profile and ensure tenant association.
         """
@@ -112,17 +118,19 @@ class HospitalProfile(models.Model):
 
         # Get or create the tenant permission
         TenantMembership = apps.get_model("core", "TenantMembership")
-        tenant_permission, _ = TenantMembership.objects.get_or_create(
-            user=user,
-            schema_name=self.tenant.schema_name,
-            defaults={"permission_type": "STAFF"}
-        )
+        if not user.tenant_memberships.filter(tenant=self.tenant).exists():
+            TenantMembership.objects.create(
+                user=user,
+                tenant=self.tenant,
+                role=role
+            )
+        user.tenant = self.tenant  # Set default tenant context
+        user.save()
 
         # Create the membership record explicitly
         HospitalStaffMembership.objects.create(
             hospital=self,
             user=user,
-            tenant_permission=tenant_permission,
             is_active=True
         )
 

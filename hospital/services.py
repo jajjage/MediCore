@@ -3,22 +3,9 @@ import uuid
 
 from django.apps import apps
 from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
-from django.core.cache import cache
 from django.db import connection, transaction
 
-from apps.staff.models import (
-    Department,
-    DepartmentMember,
-    DoctorProfile,
-    NurseProfile,
-    StaffMember,
-    StaffRole,
-    StaffTransfer,
-    TechnicianProfile,
-    WorkloadAssignment,
-)
-from core.models import ModelPermission, TenantPermission
+from core.models import TenantMembership
 from tenants.models import Client, Domain
 
 from .models import HospitalProfile, HospitalStaffMembership
@@ -65,7 +52,7 @@ class TenantCreationService:
         return apps.get_model("staff", "StaffMember")
 
     @staticmethod
-    def add_hospital_membership(hospital, user, tenant_permission ):
+    def add_hospital_membership(hospital, user):
         """
         Add a staff member to the hospital profile and ensure tenant association.
         """
@@ -73,57 +60,19 @@ class TenantCreationService:
         HospitalStaffMembership.objects.create(
             hospital=hospital,
             user=user,
-            tenant_permission=tenant_permission,
             is_active=True
         )
-
-
-    @staticmethod
-    def setup_model_permissions(tenant_permission, is_admin=False):  # noqa: FBT002
-        """Han Setup initial model permissions for a user."""
-        # Define the models and their permissions
-        STAFF_MODELS = {  # noqa: N806
-            Department: ["view", "add", "change", "delete"] if is_admin else ["view"],
-            DepartmentMember: ["view", "add", "change", "delete"] if is_admin else ["view"],
-            NurseProfile: ["view", "add", "change", "delete"] if is_admin else ["view"],
-            DoctorProfile: ["view", "add", "change", "delete"] if is_admin else ["view"],
-            StaffMember: ["view", "add", "change", "delete"] if is_admin else ["view"],
-            StaffRole: ["view", "add", "change", "delete"] if is_admin else ["view"],
-            StaffTransfer: ["view", "add", "change", "delete"] if is_admin else ["view"],
-            TechnicianProfile: ["view", "add", "change", "delete"] if is_admin else ["view"],
-            WorkloadAssignment: ["view", "add", "change", "delete"] if is_admin else ["view"],
-            # Add other models and their permissions here
-        }
-
-        permissions_to_create = []
-        for model, actions in STAFF_MODELS.items():
-            content_type = ContentType.objects.get_for_model(model)
-            for action in actions:
-                permissions_to_create.extend([
-                    ModelPermission(
-                        tenant_permission=tenant_permission,
-                        content_type=content_type,
-                        permission_type=action
-                    )
-                ])
-
-        # Bulk create all permissions
-        ModelPermission.objects.bulk_create(permissions_to_create)
 
     @staticmethod
     def setup_initial_permissions(tenant, admin_user):
         """ASetup initial permissions for the tenant admin."""
         # Create admin permission for the tenant
-        tenant_permission = TenantPermission.objects.create(
+        tenant_membership = TenantMembership.objects.create(
             user=admin_user,
-            schema_name=tenant.schema_name,
-            permission_type="ADMIN"
+            tenant=tenant,
+            role="ADMIN"
         )
-
-        # Invalidate any existing permission cache for this user
-        cache_key = f"tenant_access_{admin_user.id}_{tenant.schema_name}"
-        cache.delete(cache_key)
-        return tenant_permission
+        return tenant_membership
 
     @staticmethod
     @transaction.atomic
@@ -154,12 +103,10 @@ class TenantCreationService:
             first_name=validated_data["admin_first_name"],
             last_name=validated_data["admin_last_name"],
             phone_number=validated_data["admin_phone_number"],
-            hospital=tenant,
         )
 
         # Setup initial permissions
-        tenant_permission = TenantCreationService.setup_initial_permissions(tenant, admin_user)
-        TenantCreationService.setup_model_permissions(tenant_permission, is_admin=True)
+        TenantCreationService.setup_initial_permissions(tenant, admin_user)
 
         # Create hospital profile
         hospital_profile = HospitalProfile.objects.create(
@@ -174,43 +121,32 @@ class TenantCreationService:
             specialty=validated_data.get("specialty", ""),
             bed_capacity=validated_data.get("bed_capacity"),
         )
-        TenantCreationService.add_hospital_membership(hospital_profile, admin_user, tenant_permission)
+        TenantCreationService.add_hospital_membership(hospital_profile, admin_user)
         return hospital_profile
 
     @staticmethod
     @transaction.atomic
-    def add_user_to_tenant(user, tenant, permission_type="VIEWER"):
+    def add_user_to_tenant(user, tenant, role="VIEWER"):
         """
         Add a user to a tenant with specified permissions.
 
         Args:
             user: The user to add
             tenant: The tenant to add the user to
-            permission_type: The type of permission to grant (ADMIN, STAFF, or VIEWER)
+            role: The type of permission to grant (ADMIN, STAFF, or VIEWER)
 
         """
         # Validate permission type
-        if permission_type not in ["ADMIN", "STAFF", "VIEWER"]:
+        if role not in ["ADMIN", "STAFF", "VIEWER"]:
             raise ValueError("Invalid permission type")
 
-        tenant_permission = TenantPermission.objects.create(
+        tenant_membership = TenantMembership.objects.create(
             user=user,
-            schema_name=tenant.schema_name,
-            permission_type=permission_type
+            tenant=tenant,
+            role=role
         )
 
-        # Setup model permissions based on role
-        is_admin = permission_type == "ADMIN"
-        TenantCreationService.setup_model_permissions(
-            tenant_permission,
-            is_admin=is_admin
-        )
-
-        # Invalidate permission cache
-        cache_key = f"tenant_access_{user.id}_{tenant.schema_name}"
-        cache.delete(cache_key)
-
-        return tenant_permission
+        return tenant_membership
 
     @staticmethod
     @transaction.atomic
@@ -224,26 +160,23 @@ class TenantCreationService:
 
         """
         # Delete permission
-        TenantPermission.objects.filter(
+        TenantMembership.objects.filter(
             user=user,
-            schema_name=tenant.schema_name
+            tenant=tenant
         ).delete()
 
-        # Invalidate permission cache
-        cache_key = f"tenant_access_{user.id}_{tenant.schema_name}"
-        cache.delete(cache_key)
 
     @staticmethod
-    def get_tenant_users(tenant, permission_type=None):
+    def get_tenant_users(tenant, role=None):
         """
         Get all users with access to a tenant, optionally filtered by permission type.
 
         Args:
             tenant: The tenant to get users for
-            permission_type: Optional permission type to filter by
+            role: Optional permission type to filter by
 
         """
-        query = TenantPermission.objects.filter(schema_name=tenant.schema_name)
-        if permission_type:
-            query = query.filter(permission_type=permission_type)
+        query = TenantMembership.objects.filter(tenant_id=tenant.id)
+        if role:
+            query = query.filter(role=role)
         return query.select_related("user")
