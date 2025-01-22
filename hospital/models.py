@@ -3,9 +3,7 @@ import uuid
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
-
-from tenants.models import Client
+from django.db import models, transaction
 
 
 class HospitalStaffMembership(models.Model):
@@ -13,34 +11,33 @@ class HospitalStaffMembership(models.Model):
 
     hospital = models.ForeignKey("hospital.HospitalProfile", on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    tenant_permission = models.ForeignKey(
-        "core.TenantPermission",
+    member_permission = models.ForeignKey(
+        "core.TenantMemberships",
         on_delete=models.CASCADE,
         help_text="The staff member's role and permissions in this hospital"
-    )
+    ) # I would be back for checking
+
     joined_date = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "hospital_staff_membership"
         unique_together = ("hospital", "user")
+        indexes = [
+            models.Index(fields=["hospital", "user"]),
+            models.Index(fields=["is_active"])
+        ]
 
     def __str__(self):
         return (
             f"{self.user.email} - "
-            f"{self.tenant_permission.get_permission_type_display()} at "
+            f"{self.member_permission.role} at "
             f"{self.hospital.hospital_name}"
         )
 
     def clean(self):
-        if self.user == self.hospital.admin_user:
-            raise ValidationError("Cannot create membership for primary admin")
-
-        if self.user.hospital != self.hospital.tenant:
-            raise ValidationError("User must belong to the same tenant as the hospital")
-
         # Validate that the tenant_permission matches the hospital's tenant
-        if self.tenant_permission.schema_name != self.hospital.tenant.schema_name:
+        if self.member_permission.tenant_id != self.hospital.tenant.id:
             raise ValidationError(
                 "Tenant permission must be for the same tenant as the hospital"
             )
@@ -53,7 +50,9 @@ class HospitalProfile(models.Model):
 
     admin_user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
         related_name="administered_hospital"
     )
     additional_staff = models.ManyToManyField(
@@ -69,7 +68,7 @@ class HospitalProfile(models.Model):
         ("premium", "Premium"),
     ]
     subscription_plan = models.CharField(max_length=20, choices=SUBSCRIPTION_CHOICES)
-    hospital_name = models.CharField(max_length=200)
+    hospital_name = models.CharField(max_length=200, unique=True)
     license_number = models.CharField(max_length=100, unique=True)
     contact_email = models.EmailField()
     contact_phone = models.CharField(max_length=20)
@@ -92,19 +91,6 @@ class HospitalProfile(models.Model):
     def clean(self):
         super().clean()
 
-        if self.tenant_id and self.pk is None and Client.objects.filter(schema_name=self.tenant.schema_name).exists():
-            raise ValidationError(
-                {"tenant": "A tenant with this schema name already exists."}
-            )
-
-        User = apps.get_model(settings.AUTH_USER_MODEL.split(".")[0],
-                            settings.AUTH_USER_MODEL.split(".")[1])
-
-        if User.objects.filter(email=self.contact_email).exists():
-            raise ValidationError(
-                {"contact_email": "A user with this email already exists."}
-            )
-
         if (
             HospitalProfile.objects.filter(license_number=self.license_number)
             .exclude(pk=self.pk)
@@ -113,7 +99,7 @@ class HospitalProfile(models.Model):
             raise ValidationError(
                 {"license_number": "This license number is already registered."}
             )
-
+    @transaction.atomic
     def add_staff_member(self, user):
         """
         Add a staff member to the hospital profile and ensure tenant association.
@@ -121,11 +107,6 @@ class HospitalProfile(models.Model):
         if user.hospital != self.tenant:
             raise ValidationError(
                 "User's tenant must match the hospital profile's tenant"
-            )
-
-        if hasattr(user, "administered_hospital") and user.administered_hospital != self:
-            raise ValidationError(
-                "User is already an admin for another hospital"
             )
 
         if hasattr(user, "associated_hospitals") and \
@@ -152,9 +133,6 @@ class HospitalProfile(models.Model):
 
     def remove_staff_member(self, user):
         """Remove a staff member from the hospital profile."""
-        if user == self.admin_user:
-            raise ValidationError("Cannot remove primary admin user")
-
         HospitalStaffMembership.objects.filter(
             hospital=self,
             user=user
