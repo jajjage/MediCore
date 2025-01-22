@@ -3,9 +3,9 @@ import uuid
 from django.contrib.auth.models import (
     AbstractBaseUser,
     BaseUserManager,
+    Group,
     PermissionsMixin,
 )
-from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import connection, models
@@ -13,72 +13,37 @@ from django.db import connection, models
 from hospital.models import HospitalProfile
 
 
-class TenantPermission(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    PERMISSION_CHOICES = [
+class TenantMemberships(models.Model):
+    ROLE_CHOICES = [
         ("ADMIN", "Admin"),
         ("STAFF", "Staff"),
         ("VIEWER", "Viewer"),
     ]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         "MyUser",
         on_delete=models.CASCADE,
-        related_name="tenant_permissions"
+        related_name="tenant_memberships"
     )
-    schema_name = models.CharField(max_length=63)
-    permission_type = models.CharField(max_length=20, choices=PERMISSION_CHOICES)
+    tenant = models.ForeignKey("tenants.Client",  on_delete=models.CASCADE)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    groups = models.ManyToManyField(Group, blank=True )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ["user", "schema_name"]
-        db_table = "core_tenant_permission"
-
-class ModelPermission(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
-    tenant_permission = models.ForeignKey(
-        TenantPermission,
-        on_delete=models.CASCADE,
-        related_name="model_permissions"
-    )
-
-    content_type = models.ForeignKey(
-        ContentType,
-        on_delete=models.CASCADE,
-        help_text="The model this permission applies to"
-    )
-
-    PERMISSION_TYPES = [
-        ("view", "Can View"),
-        ("add", "Can Add"),
-        ("change", "Can Change"),
-        ("delete", "Can Delete"),
-    ]
-    permission_type = models.CharField(
-        max_length=10,
-        choices=PERMISSION_TYPES,
-        help_text="The type of permission granted"
-    )
-
-    class Meta:
-        db_table = "core_model_permission"
-        unique_together = ["tenant_permission", "content_type", "permission_type"]
-
-    def __str__(self):
-        return f"{self.tenant_permission.user.email} - {self.get_permission_type_display()} {self.content_type.model}"
-
-
+        db_table = "core_tenant_memberships"
+        unique_together = ["user", "tenant"]
+        indexes = [
+            models.Index(fields=["tenant", "role"]),
+        ]
 
 class MyUserManager(BaseUserManager):
-    def create_tenant_admin(self, email, hospital, password=None, **kwargs):
+    def create_tenant_admin(self, email, password=None, **kwargs):
         if not email:
             raise ValueError("Users must have an email address")
-        if not hospital:
-            raise ValueError("Tenant admin must be associated with a hospital")
 
         user = self.model(
             email=self.normalize_email(email),
-            hospital=hospital,
             is_tenant_admin=True,
             **kwargs
         )
@@ -100,13 +65,6 @@ class MyUserManager(BaseUserManager):
 class MyUser(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
-    hospital = models.ForeignKey(
-        "tenants.Client",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="staff_members"
-    )
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=True)
     is_tenant_admin = models.BooleanField(default=False)
@@ -118,20 +76,6 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    groups = models.ManyToManyField(
-        "auth.Group",
-        related_name="myuser_set",
-        blank=True,
-        verbose_name="groups",
-        help_text="The groups this user belongs to.",
-    )
-    user_permissions = models.ManyToManyField(
-        "auth.Permission",
-        related_name="myuser_set",
-        blank=True,
-        verbose_name="user permissions",
-        help_text="Specific permissions for this user.",
-    )
 
     objects = MyUserManager()
 
@@ -170,17 +114,17 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
         cache.set(cache_key, has_access, timeout=300)  # Cache for 5 minutes
         return has_access
 
-    def get_tenant_permission_type(self, schema_name):
-        """Get the permission type for a specific tenant."""
-        if (self.is_superuser and connection.schema_name == "public") or (self.is_tenant_admin and self.hospital and self.hospital.schema_name == schema_name):
-            return "ADMIN"
-        else:  # noqa: RET505
-            try:
-                permission = self.tenant_permissions.get(schema_name=schema_name)
-            except TenantPermission.DoesNotExist:
-                return None
-            else:
-                return permission.permission_type
+    # def get_tenant_permissions(self, schema_name):
+    #     """Get the permission type for a specific tenant."""
+    #     if (self.is_superuser and connection.schema_name == "public") or (self.is_tenant_admin and self.hospital and self.hospital.schema_name == schema_name):
+    #         return "ADMIN"
+    #     else:
+    #         try:
+    #             permission = self.tenant_permissions.get(schema_name=schema_name)
+    #         except TenantPermission.DoesNotExist:
+    #             return None
+    #         else:
+    #             return permission.permission_type
 
     def has_perm(self, perm, obj=None):
         if connection.schema_name == "public":
