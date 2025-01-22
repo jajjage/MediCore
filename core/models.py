@@ -7,10 +7,7 @@ from django.contrib.auth.models import (
     PermissionsMixin,
 )
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
 from django.db import connection, models
-
-from hospital.models import HospitalProfile
 
 
 class TenantMemberships(models.Model):
@@ -84,74 +81,82 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
     class Meta:
         db_table = "core_user"
 
-    def clean(self):
-        if self.is_tenant_admin and not self.hospital:
-            raise ValidationError("Tenant admin must be associated with a hospital")
 
-        if self.hospital:
-            try:
-                profile = HospitalProfile.objects.get(tenant=self.hospital)
-                if self.is_tenant_admin and profile.admin_user_id and profile.admin_user_id != self.id:
-                    raise ValidationError("This hospital already has a primary admin")
-            except HospitalProfile.DoesNotExist as err:
-                raise ValidationError("Associated hospital has no profile") from err
+    def clear_permission_cache(self):
+        """Clear all cached permissions for this user."""
+        keys = [
+            f"user_perms_{self.id}_*",
+            f"tenant_access_{self.id}_*",
+            f"tenant_role_{self.id}_*",
+        ]
+        for key in keys:
+            cache.delete_pattern(key)
 
-    def has_tenant_access(self, schema_name):
-        """Check if user has access to specific tenant."""
-        cache_key = f"tenant_access_{self.id}_{schema_name}"
+    def has_tenant_access(self, tenant_schema):
+        """Check if user has access to a specific tenant (with caching)."""
+        cache_key = f"tenant_access_{self.id}_{tenant_schema}"
         cached_result = cache.get(cache_key)
 
         if cached_result is not None:
             return cached_result
 
-        if (self.is_superuser and connection.schema_name == "public") or (self.is_tenant_admin and self.hospital and self.hospital.schema_name == schema_name):
-            has_access = True
-        else:
-            has_access = self.tenant_permissions.filter(
-                schema_name=schema_name
-            ).exists()
+        has_access = self.tenant_memberships.filter(
+            tenant__schema_name=tenant_schema
+        ).exists()
 
-        cache.set(cache_key, has_access, timeout=300)  # Cache for 5 minutes
+        cache.set(cache_key, has_access, 300)  # Cache for 5 minutes
         return has_access
 
-    # def get_tenant_permissions(self, schema_name):
-    #     """Get the permission type for a specific tenant."""
-    #     if (self.is_superuser and connection.schema_name == "public") or (self.is_tenant_admin and self.hospital and self.hospital.schema_name == schema_name):
-    #         return "ADMIN"
-    #     else:
-    #         try:
-    #             permission = self.tenant_permissions.get(schema_name=schema_name)
-    #         except TenantPermission.DoesNotExist:
-    #             return None
-    #         else:
-    #             return permission.permission_type
+    def get_tenant_role(self, tenant_schema):
+        """Get user's role in a specific tenant (with caching)."""
+        cache_key = f"tenant_role_{self.id}_{tenant_schema}"
+        cached_role = cache.get(cache_key)
+
+        if cached_role is not None:
+            return cached_role
+
+        try:
+            membership = self.tenant_memberships.get(
+                tenant__schema_name=tenant_schema
+            )
+            cache.set(cache_key, membership.role, 300)
+            return membership.role
+        except TenantMemberships.DoesNotExist:
+            return None
+
+    def get_tenant_permissions(self, tenant_schema):
+        """Get all permissions for a specific tenant."""
+        cache_key = f"tenant_perms_{self.id}_{tenant_schema}"
+        cached_perms = cache.get(cache_key)
+
+        if cached_perms is not None:
+            return cached_perms
+
+        try:
+            membership = self.tenant_memberships.get(
+                tenant__schema_name=tenant_schema
+            )
+            perms = set()
+
+            # Get permissions from groups
+            for group in membership.groups.all():
+                perms.update(group.permissions.values_list("codename", flat=True))
+
+            cache.set(cache_key, perms, 300)
+            return perms
+
+        except TenantMemberships.DoesNotExist:
+            return set()
 
     def has_perm(self, perm, obj=None):
-        if connection.schema_name == "public":
-            if self.is_superuser:
-                app_label = perm.split(".")[0]
-                return app_label in ["auth", "core", "tenants"]
-            return False
-
-        permission_type = self.get_tenant_permission_type(connection.schema_name)
-        if permission_type == "ADMIN":
+        """Override default permission check with tenant context."""
+        if self.is_superuser:
             return True
-        if permission_type == "STAFF":
-            # Add your staff permission logic here
-            app_label = perm.split(".")[0]
-            return app_label not in ["auth", "core", "tenants"]
-        return False
 
-    def has_module_perms(self, app_label):
-        if connection.schema_name == "public":
-            if self.is_superuser:
-                return app_label in ["auth", "core", "tenants"]
-            return False
+        # Get tenant schema from current connection
+        tenant_schema = connection.schema_name
 
-        permission_type = self.get_tenant_permission_type(connection.schema_name)
-        if permission_type == "ADMIN":
-            return app_label not in ["auth", "core", "tenants"]
-        if permission_type == "STAFF":
-            # Add your staff module permission logic here
-            return app_label not in ["auth", "core", "tenants"]
-        return False
+        if tenant_schema == "public":
+            return super().has_perm(perm, obj)
+
+        return perm in self.get_tenant_permissions(tenant_schema)
