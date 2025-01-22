@@ -2,23 +2,19 @@ import uuid
 
 from django.apps import apps
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.core.cache import cache
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models, transaction
 
 
 class HospitalStaffMembership(models.Model):
     """Through model for hospital staff membership with additional metadata."""
 
-    hospital = models.ForeignKey("hospital.HospitalProfile", on_delete=models.CASCADE)
+    hospital = models.ForeignKey("HospitalProfile", on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    member_permission = models.ForeignKey(
-        "core.TenantMemberships",
-        on_delete=models.CASCADE,
-        help_text="The staff member's role and permissions in this hospital"
-    ) # I would be back for checking
-
     joined_date = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
+
 
     class Meta:
         db_table = "hospital_staff_membership"
@@ -31,13 +27,13 @@ class HospitalStaffMembership(models.Model):
     def __str__(self):
         return (
             f"{self.user.email} - "
-            f"{self.member_permission.role} at "
+            f"{self.user.tenant_memberships.role} at "
             f"{self.hospital.hospital_name}"
         )
 
     def clean(self):
         # Validate that the tenant_permission matches the hospital's tenant
-        if self.member_permission.tenant_id != self.hospital.tenant.id:
+        if self.user.tenant_memberships.tenant_id != self.hospital.tenant.id:
             raise ValidationError(
                 "Tenant permission must be for the same tenant as the hospital"
             )
@@ -51,7 +47,6 @@ class HospitalProfile(models.Model):
     admin_user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
-        blank=True,
         null=True,
         related_name="administered_hospital"
     )
@@ -104,8 +99,8 @@ class HospitalProfile(models.Model):
         """
         Add a staff member to the hospital profile and ensure tenant association.
         """
-        if user.hospital != self.tenant:
-            raise ValidationError(
+        if user.tenant_membership.tenant != self.tenant:
+            raise PermissionDenied(
                 "User's tenant must match the hospital profile's tenant"
             )
 
@@ -116,8 +111,8 @@ class HospitalProfile(models.Model):
             )
 
         # Get or create the tenant permission
-        TenantPermission = apps.get_model("core", "TenantPermission")
-        tenant_permission, _ = TenantPermission.objects.get_or_create(
+        TenantMembership = apps.get_model("core", "TenantMembership")
+        tenant_permission, _ = TenantMembership.objects.get_or_create(
             user=user,
             schema_name=self.tenant.schema_name,
             defaults={"permission_type": "STAFF"}
@@ -146,9 +141,15 @@ class HospitalProfile(models.Model):
 
     def get_all_staff(self):
         """Get all staff members including the primary admin."""
+        cache_key = f"hospital_{self.id}_staff"
+        staff = cache.get(cache_key)
         User = apps.get_model(settings.AUTH_USER_MODEL.split(".")[0],
                             settings.AUTH_USER_MODEL.split(".")[1])
-        return User.objects.filter(
-            models.Q(id=self.admin_user.id) |
-            models.Q(id__in=self.additional_staff.all())
-        ).distinct()
+        if not staff:
+            staff = User.objects.filter(
+                        models.Q(id=self.admin_user.id) |
+                        models.Q(id__in=self.additional_staff.all())
+                    ).distinct()
+            cache.set(cache_key, staff, timeout=300)
+        return staff
+

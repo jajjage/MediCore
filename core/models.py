@@ -10,7 +10,7 @@ from django.core.cache import cache
 from django.db import connection, models
 
 
-class TenantMemberships(models.Model):
+class TenantMembership(models.Model):
     ROLE_CHOICES = [
         ("ADMIN", "Admin"),
         ("STAFF", "Staff"),
@@ -121,7 +121,7 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
             )
             cache.set(cache_key, membership.role, 300)
             return membership.role
-        except TenantMemberships.DoesNotExist:
+        except TenantMembership.DoesNotExist:
             return None
 
     def get_tenant_permissions(self, tenant_schema):
@@ -145,7 +145,7 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
             cache.set(cache_key, perms, 300)
             return perms
 
-        except TenantMemberships.DoesNotExist:
+        except TenantMembership.DoesNotExist:
             return set()
 
     def has_perm(self, perm, obj=None):
