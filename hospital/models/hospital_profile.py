@@ -6,53 +6,18 @@ from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models, transaction
 
-
-class HospitalStaffMembership(models.Model):
-    """Through model for hospital staff membership with additional metadata."""
-
-    hospital = models.ForeignKey("HospitalProfile", on_delete=models.CASCADE)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    joined_date = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
+from .hospital_members import HospitalMembership
 
 
-    class Meta:
-        db_table = "hospital_staff_membership"
-        unique_together = ("hospital", "user")
-        indexes = [
-            models.Index(fields=["hospital", "user"]),
-            models.Index(fields=["is_active"])
-        ]
-
-    def __str__(self):
-        return (
-            f"{self.user.email} - "
-            f"{self.user.tenant_memberships.role} at "
-            f"{self.hospital.hospital_name}"
-        )
-
-    def clean(self):
-        # Validate that the tenant_permission matches the hospital's tenant
-        if self.user.tenant_memberships.tenant_id != self.hospital.tenant.id:
-            raise ValidationError(
-                "Tenant permission must be for the same tenant as the hospital"
-            )
 class HospitalProfile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.OneToOneField(
         "tenants.Client",
         on_delete=models.CASCADE,
-        related_name="profile")
-
-    admin_user = models.OneToOneField(
+        related_name="hospital_profile")
+    staff = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="administered_hospital"
-    )
-    additional_staff = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        through="HospitalStaffMembership",
+        through="hospital.HospitalMembership",
         related_name="associated_hospitals",
         blank=True
     )
@@ -105,7 +70,7 @@ class HospitalProfile(models.Model):
         """
         Add a staff member to the hospital profile and ensure tenant association.
         """
-        if user.tenant_membership.tenant != self.tenant:
+        if user.hospital_membership.tenant != self.tenant:
             raise PermissionDenied(
                 "User's tenant must match the hospital profile's tenant"
             )
@@ -117,27 +82,22 @@ class HospitalProfile(models.Model):
             )
 
         # Get or create the tenant permission
-        TenantMembership = apps.get_model("core", "TenantMembership")
-        if not user.tenant_memberships.filter(tenant=self.tenant).exists():
-            TenantMembership.objects.create(
+        if not user.hospital_memberships.filter(tenant_id=self.tenant.id).exists():
+            HospitalMembership.objects.create(
                 user=user,
                 tenant=self.tenant,
+                hospital_profile=self,
                 role=role
             )
         user.tenant = self.tenant  # Set default tenant context
         user.save()
 
-        # Create the membership record explicitly
-        HospitalStaffMembership.objects.create(
-            hospital=self,
-            user=user,
-            is_active=True
-        )
 
     def remove_staff_member(self, user):
         """Remove a staff member from the hospital profile."""
-        HospitalStaffMembership.objects.filter(
-            hospital=self,
+        HospitalMembership = apps.get_model("core", "HospitalMembership")
+        HospitalMembership.objects.filter(
+            hospital_profile=self,
             user=user
         ).delete()
 
@@ -148,16 +108,17 @@ class HospitalProfile(models.Model):
         )
 
     def get_all_staff(self):
-        """Get all staff members including the primary admin."""
+        """
+        AReturns all staff members associated with this hospital.
+
+        This includes the admin user and additional staff
+        """
         cache_key = f"hospital_{self.id}_staff"
         staff = cache.get(cache_key)
-        User = apps.get_model(settings.AUTH_USER_MODEL.split(".")[0],
-                            settings.AUTH_USER_MODEL.split(".")[1])
         if not staff:
-            staff = User.objects.filter(
-                        models.Q(id=self.admin_user.id) |
-                        models.Q(id__in=self.additional_staff.all())
-                    ).distinct()
+            staff_memberships = self.hospital_memberships.select_related("user").all()
+            staff = [{"user": m.user, "role": m.role} for m in staff_memberships]
             cache.set(cache_key, staff, timeout=300)
         return staff
+
 

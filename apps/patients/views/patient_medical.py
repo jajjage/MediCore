@@ -1,7 +1,7 @@
 from apps.patients.base_view.base_patients_view import BasePatientViewSet
 from apps.patients.models import (
     PatientAllergies,
-    PatientChronicConditions,
+    PatientChronicCondition,
 )
 from apps.patients.serializers import (
     PatientAllergySerializer,
@@ -29,7 +29,7 @@ class PatientChronicConditionViewSet(BasePatientViewSet):
 
 
     def get_queryset(self):
-        return PatientChronicConditions.objects.filter(
+        return PatientChronicCondition.objects.filter(
             patient_id=self.kwargs.get("patient__pk")
         )
 

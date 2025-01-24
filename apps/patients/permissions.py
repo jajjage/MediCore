@@ -2,10 +2,8 @@ from django.core.cache import cache
 from rest_framework.permissions import BasePermission
 
 from apps.staff.helper import (
-    convert_queryset_to_role_permissions,
     normalize_permissions_dict,
 )
-from apps.staff.models import StaffRole
 
 ROLE_PERMISSIONS = {
     "DOCTOR": {
@@ -149,21 +147,21 @@ class RolePermission(BasePermission):
         cache_key = f"user_role_permissions_{user_role}"
         # Check cache first
         permissions = cache.get(cache_key)
-        try:
-            role = StaffRole.objects.get(code=user_role)
-        except StaffRole.DoesNotExist as err:
-            raise ValueError(
-                f"No StaffRole found with code: normalize_role: {user_role}"
-            ) from err
-        if permissions is None:
-            permissions_queryset = role.permissions.all()
-            # Convert to desired structure
-            permissions_dict = convert_queryset_to_role_permissions(
-                permissions_queryset
-            )
-            # Cache the permissions for 1 hour
-            cache.set(cache_key, permissions_dict, timeout=3600)
-            permissions = permissions_dict
+        # try:
+        #     role = StaffRole.objects.get(code=user_role)
+        # except StaffRole.DoesNotExist as err:
+        #     raise ValueError(
+        #         f"No StaffRole found with code: normalize_role: {user_role}"
+        #     ) from err
+        # if permissions is None:
+        #     permissions_queryset = role.permissions.all()
+        #     # Convert to desired structure
+        #     permissions_dict = convert_queryset_to_role_permissions(
+        #         permissions_queryset
+        #     )
+        #     # Cache the permissions for 1 hour
+        #     cache.set(cache_key, permissions_dict, timeout=3600)
+        #     permissions = permissions_dict
 
         # Check if the user's role has the required permission
         model_permissions = permissions.get(normalized_resource, [])
@@ -189,22 +187,22 @@ class PermissionCheckedSerializerMixin:
         cache_key = f"user_role_permissions_{user_role}"
         permissions = cache.get(cache_key)
 
-        try:
-            role = StaffRole.objects.get(code=normalize_role)
-            print(f"Found role: {role}")
-        except StaffRole.DoesNotExist as err:
-            print(f"Role not found: {normalize_role}")
-            raise ValueError(
-                f"No StaffRole found with code: normalize_role: {normalize_role}"
-            ) from err
+        # try:
+        #     role = StaffRole.objects.get(code=normalize_role)
+        #     print(f"Found role: {role}")
+        # except StaffRole.DoesNotExist as err:
+        #     print(f"Role not found: {normalize_role}")
+        #     raise ValueError(
+        #         f"No StaffRole found with code: normalize_role: {normalize_role}"
+        #     ) from err
 
-        if permissions is None:
-            permissions_queryset = role.permissions.all()
-            permissions_dict = convert_queryset_to_role_permissions(
-                permissions_queryset
-            )
-            cache.set(cache_key, permissions_dict, timeout=36)
-            permissions = permissions_dict
+        # if permissions is None:
+        #     permissions_queryset = role.permissions.all()
+        #     permissions_dict = convert_queryset_to_role_permissions(
+        #         permissions_queryset
+        #     )
+        #     cache.set(cache_key, permissions_dict, timeout=36)
+        #     permissions = permissions_dict
 
         if hasattr(request.user, "user_permissions"):
             model_permissions = permissions.get(model_name, [])

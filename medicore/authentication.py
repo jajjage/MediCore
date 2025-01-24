@@ -4,18 +4,12 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import connection
-from django_tenants.utils import get_public_schema_name
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
 logger = logging.getLogger(__name__)
 
 class RobustCookieJWTAuthentication(JWTAuthentication):
-    def _check_low_level_user_access(self, user, schema_name):
-        """
-        Verify access for low-level users living within the tenant schema.
-        """
-        return user.hospital and user.hospital.tenant.schema_name == schema_name
     def get_user_from_model(self, validated_token, user_model):
         """AHelper method to get user from a specific model."""
         try:
@@ -43,23 +37,7 @@ class RobustCookieJWTAuthentication(JWTAuthentication):
         if not user:
             logger.warning("User not found in public schema")
             raise TokenError("User not found in public schema")
-        return user, user_model
-
-    def _get_tenant_schema_user(self, validated_token):
-        from django.apps import apps
-
-        from apps.staff.models import StaffMember
-        user_model = apps.get_model("core", "MyUser")
-
-        user = self.get_user_from_model(validated_token, StaffMember)
-        if not user:
-            user = self.get_user_from_model(validated_token, user_model)
-
-        if not user:
-            logger.warning("User not found in either StaffMember or MyUser")
-            raise TokenError("User not found in tenant schema")
-
-        return user, user_model, StaffMember
+        return user
 
     def authenticate(self, request):
         try:
@@ -70,39 +48,16 @@ class RobustCookieJWTAuthentication(JWTAuthentication):
 
             validated_token = self._get_validated_token(raw_token)
             schema_name = connection.schema_name
-            is_public_schema = schema_name == get_public_schema_name()
 
-            if is_public_schema:
-                user, user_model = self._get_public_schema_user(validated_token)
-                if not isinstance(user, user_model):
-                    raise TokenError("Invalid user type for public schema")
-            else:
-                user, user_model, staffmember = self._get_tenant_schema_user(validated_token)
-                if not is_public_schema and isinstance(user, (user_model, staffmember)):
-                    is_high_level_user = hasattr(user, "has_tenant_access")
-                    cache_key = f"tenant_access_{user.id}_{schema_name}"
-                    has_access = cache.get(cache_key)
-                    if has_access is None:
-                        if is_high_level_user:
-                            # High-level user access logic
-                            has_access = user.has_tenant_access(schema_name)
-                             # You might want to add the permission type to the request
-                            request.tenant_permission_type = user.get_tenant_permission_type(schema_name)
-                        else:
-                            # Low-level user access logic
-                            has_access = self._check_low_level_user_access(user, schema_name)
-                            print(f"user hospital {user.first_name}")
+            if schema_name:
+                user = self._get_public_schema_user(validated_token)
+                cache_key = f"tenant_access_{user.id}_{schema_name}"
+                has_access = cache.get(cache_key)
 
-                        cache.set(cache_key, has_access, timeout=300)
-
-                    if not has_access:
-                        logger.warning(
-                            f"MyUser {user.id} attempted to access unauthorized "
-                            f"tenant {schema_name}"
-                        )
-                        raise TokenError("User not authorized for this tenant")
-                    if is_high_level_user:
-                        request.tenant_permission_type = user.get_tenant_permission_type(schema_name)
+                # print(user.get_tenant_permissions(schema_name))
+                if has_access is None:
+                    has_access = user.has_tenant_access(schema_name)
+                    request.get_tenant_permissions = user.get_tenant_permissions(schema_name)
             return user, validated_token
 
         except (TokenError, InvalidToken) as e:

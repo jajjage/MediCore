@@ -9,6 +9,13 @@ from simple_history.models import HistoricalRecords
 from utils.encryption import field_encryption
 
 
+class Basemodel(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    history = HistoricalRecords(inherit=True)
+    patient = models.ForeignKey("Patient", on_delete=models.CASCADE, related_name="%(class)s")
+    class Meta:
+        abstract = True
+
 class Patient(models.Model):
     MAX_PIN_LENGTH = 15
 
@@ -27,7 +34,7 @@ class Patient(models.Model):
     date_of_birth = models.DateField()
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
     nin_encrypted = models.CharField(max_length=255, blank=True, null=True)
-    history = HistoricalRecords(user_model="staff.StaffMember")
+    history = HistoricalRecords()
 
     # Contact details
     email = models.EmailField(unique=True)

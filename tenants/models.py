@@ -29,13 +29,13 @@ class Client(TenantMixin):
         from core.models import MyUser
         return MyUser.objects.filter(
             models.Q(hospital=self) |
-            models.Q(tenant_permissions__schema_name=self.schema_name)
+            models.Q(tenant_memberships__tenant_id=self.id)
         ).distinct()
 
 
 class Domain(DomainMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(Client, on_delete=models.CASCADE)
+    tenant = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="domains")
 
     def __str__(self):
         return self.domain

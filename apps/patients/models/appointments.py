@@ -1,14 +1,13 @@
-import uuid
 from datetime import datetime
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
-from simple_history.models import HistoricalRecords
 
-from .core import Patient
+from .core import Basemodel
 
 
-class PatientAppointment(models.Model):
+class PatientAppointment(Basemodel):
     STATUS_CHOICES = [
         ("pending", "Pending"),
         ("approved", "Approved"),
@@ -17,13 +16,10 @@ class PatientAppointment(models.Model):
         ("cancelled", "Cancelled"),
     ]
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="appointments")
     physician = models.ForeignKey(
-       "staff.StaffMember",
+       "staff.DoctorProfile",
         on_delete=models.PROTECT,
         related_name="appointments",
-        limit_choices_to={"role__name": "Doctor"}
     )
     department = models.ForeignKey(
         "staff.Department",
@@ -43,10 +39,10 @@ class PatientAppointment(models.Model):
     )
     notes = models.TextField(blank=True, null=True)
     created_by = models.ForeignKey(
-        "staff.StaffMember", on_delete=models.SET_NULL, null=True, related_name="created_appointments"
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="created_appointments"
     )
     modified_by = models.ForeignKey(
-        "staff.StaffMember", on_delete=models.SET_NULL, null=True, related_name="modified_appointments"
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="modified_appointments"
     )
     last_modified = models.DateTimeField(auto_now=True)
     is_recurring = models.BooleanField(default=False)
@@ -58,7 +54,7 @@ class PatientAppointment(models.Model):
     )
     start_time = models.DateTimeField(null=True)
     end_time = models.DateTimeField(null=True)
-    history = HistoricalRecords(user_model="staff.StaffMember")
+
 
     class Meta:
         db_table = "patient_appointments"

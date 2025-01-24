@@ -1,18 +1,11 @@
-import uuid
 
 from django.db import models
-from simple_history.models import HistoricalRecords
 
-from .core import Patient
+from .core import Basemodel
 
 
-class PatientAllergies(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    patient = models.ForeignKey(
-        Patient, on_delete=models.CASCADE, related_name="allergies"
-    )
+class PatientAllergies(Basemodel):
     name = models.CharField(max_length=100)
-    history = HistoricalRecords(user_model="staff.StaffMember")
     severity = models.CharField(
         max_length=50,
         choices=[("Mild", "Mild"), ("Moderate", "Moderate"), ("Severe", "Severe")],
@@ -27,18 +20,14 @@ class PatientAllergies(models.Model):
             models.Index(fields=["severity"]),  # Index for filtering by severity
         ]
 
-class PatientChronicConditions(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    patient = models.ForeignKey(
-        Patient, on_delete=models.CASCADE, related_name="chronic_conditions"
-    )
+class PatientChronicCondition(Basemodel):
     condition = models.CharField(max_length=100)
-    history = HistoricalRecords(user_model="staff.StaffMember")
     diagnosis_date = models.DateField(blank=True, null=True)
     notes = models.TextField(blank=True, null=True)
 
     class Meta:
         db_table = "patient_chronic_conditions"
+
         indexes = [
             models.Index(fields=["patient"]),  # Index for filtering by patient
             models.Index(fields=["condition"]),  # Index for condition name

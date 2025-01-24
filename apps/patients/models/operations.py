@@ -1,13 +1,11 @@
-import uuid
 
 from django.db import models
 from django.utils import timezone
-from simple_history.models import HistoricalRecords
 
-from .core import Patient
+from .core import Basemodel
 
 
-class PatientOperation(models.Model):
+class PatientOperation(Basemodel):
     STATUS_CHOICES = [
         ("pending", "Pending"),
         ("approved", "Approved"),
@@ -16,14 +14,8 @@ class PatientOperation(models.Model):
         ("cancelled", "Cancelled"),
     ]
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    patient = models.ForeignKey(
-        Patient,
-        on_delete=models.CASCADE,
-        related_name="operations"
-    )
     surgeon = models.ForeignKey(
-        "staff.StaffMember",
+        "staff.DoctorProfile",
         on_delete=models.CASCADE,
         related_name="operations",
         limit_choices_to={"role__name__in": ["Doctor", "Head Doctor"]},
@@ -40,16 +32,9 @@ class PatientOperation(models.Model):
         default="pending",
         db_index=True
     )
-    modified_by = models.ForeignKey(
-        "staff.StaffMember",
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="modified_operations"
-    )
     created_at = models.DateTimeField(default=timezone.now)  # Changed to have a default
     updated_at = models.DateTimeField(default=timezone.now)  # Changed to have a default
 
-    history = HistoricalRecords(user_model="staff.StaffMember")
 
     class Meta:
         db_table = "patient_operations"

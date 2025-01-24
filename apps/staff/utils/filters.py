@@ -1,4 +1,3 @@
-from django.db.models import Q
 from django_filters import rest_framework as filters
 
 from apps.staff.models import (
@@ -6,8 +5,6 @@ from apps.staff.models import (
     DepartmentMember,
     DoctorProfile,
     NurseProfile,
-    StaffMember,
-    StaffRole,
     StaffTransfer,
     TechnicianProfile,
     WorkloadAssignment,
@@ -85,23 +82,23 @@ class DepartmentFilter(filters.FilterSet):
             "is_active"
         ]
 
-class StaffMemberFilter(filters.FilterSet):
-    name = filters.CharFilter(method="filter_by_name")
-    role = filters.ModelChoiceFilter(queryset=StaffRole.objects.all())
-    department = filters.ModelChoiceFilter(
-        queryset=Department.objects.all(),
-        method="filter_by_department"
-    )
+# class StaffMemberFilter(filters.FilterSet):
+#     name = filters.CharFilter(method="filter_by_name")
+#     # role = filters.ModelChoiceFilter(queryset=StaffRole.objects.all())
+#     # department = filters.ModelChoiceFilter(
+#     #     queryset=Department.objects.all(),
+#     #     method="filter_by_department"
+#     # )
 
-    class Meta:
-        model = StaffMember
-        fields = ["name", "role", "department", "is_active", "hospital"]
+#     class Meta:
+#         model = StaffMember
+#         fields = ["name"]
 
-    def filter_by_name(self, queryset, name, value):
-        return queryset.filter(
-            Q(first_name__icontains=value) |
-            Q(last_name__icontains=value)
-        )
+#     def filter_by_name(self, queryset, name, value):
+#         return queryset.filter(
+#             Q(first_name__icontains=value) |
+#             Q(last_name__icontains=value)
+#         )
 
-    def filter_by_department(self, queryset, name, value):
-        return queryset.filter(department_memberships__department=value)
+#     def filter_by_department(self, queryset, name, value):
+#         return queryset.filter(department_memberships__department=value)

@@ -23,7 +23,7 @@ BASE_URL = env("BASE_URL", default="http://.medicore.local:8000/api/v1/")
 # Application definition
 # List of default Django apps and third-party apps that are common to both shared and tenant apps
 DEFAULT_APPS = [
-    "medicore.admin_config.CustomAdminConfig",
+    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -41,7 +41,6 @@ DEFAULT_APPS = [
 
 # Apps that are specific to individual tenants
 TENANT_APPS = [
-    *DEFAULT_APPS,  # Unpack default apps
     "apps.patients",  # Example tenant-specific app
     "apps.staff",
     # "apps.doctors",
@@ -62,7 +61,6 @@ SHARED_APPS = [
 INSTALLED_APPS = list(set(SHARED_APPS) | set(TENANT_APPS))
 
 MIDDLEWARE = [
-    "medicore.middleware.PublicSchemaMiddleware",
     "django_tenants.middleware.main.TenantMainMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -71,10 +69,9 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "medicore.middleware.AdminAccessMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "medicore.middleware.DynamicAuthModelMiddleware",
+    "medicore.middleware.SubdomainTenantMiddleware",
 
 ]
 
@@ -165,9 +162,6 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "medicore.authentication.RobustCookieJWTAuthentication",
     ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "apps.patients.permissions.RolePermission",
-    ],
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
 }
 
@@ -192,9 +186,7 @@ SIMPLE_JWT = {
     "USER_ID_CLAIM": "user_id",
     "TOKEN_TYPE_CLAIM": "token_type",
 }
-# Tenant vs Public Schema User Model Configuration
-PUBLIC_SCHEMA_USER_MODEL = "core.MyUser"
-TENANT_SCHEMA_USER_MODEL = "staff.StaffMember"
+
 
 # Add API settings
 API_VERSION = "v1"
@@ -223,9 +215,7 @@ DJOSER = {
 
 # Custom authentication backend
 AUTHENTICATION_BACKENDS = (
-    "medicore.backends.MultiSchemaModelBackend",
-    "medicore.tenant_modelperm.TenantModelPermissionBackend",
-    "django.contrib.auth.backends.ModelBackend",
+    "medicore.backends.TenantAuthBackend",
 )
 
 LANGUAGE_CODE = "en-us"

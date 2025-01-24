@@ -7,7 +7,7 @@ from apps.patients.models import (
     PatientAddress,
     PatientAllergies,
     PatientAppointment,
-    PatientChronicConditions,
+    PatientChronicCondition,
     PatientDemographics,
     PatientEmergencyContact,
     PatientOperation,
@@ -90,7 +90,7 @@ class PatientRelatedOperationsMixin:
         # Handle lists of related objects
         related_lists = {
             "allergies": PatientAllergies,
-            "chronic_conditions": PatientChronicConditions,
+            "chronic_conditions": PatientChronicCondition,
             "addresses": PatientAddress,
         }
 
@@ -133,9 +133,9 @@ class PatientCreateMixin:
                 PatientAllergies.objects.create(patient=patient, **allergy_data)
 
     def _create_chronic_conditions(self, patient, chronic_conditions_data):
-        if self.check_permission("add", "patientchronicconditions"):
+        if self.check_permission("add", "patientchroniccondition"):
             for condition_data in chronic_conditions_data:
-                PatientChronicConditions.objects.create(
+                PatientChronicCondition.objects.create(
                     patient=patient, **condition_data
                 )
 
@@ -175,7 +175,7 @@ class PatientUpdateMixin:
         ):
             instance.chronic_conditions.all().delete()
             for condition_data in chronic_conditions_data:
-                PatientChronicConditions.objects.create(
+                PatientChronicCondition.objects.create(
                     patient=instance, **condition_data
                 )
 

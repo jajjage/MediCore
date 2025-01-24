@@ -2,14 +2,9 @@ import logging
 
 from django.db import transaction
 from django.db.models import Sum
-from django.utils.timezone import now
-from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-
-from hospital.models import HospitalProfile
 
 from .base.staff_base_viewset import BaseViewSet
 from .models import (
@@ -17,8 +12,6 @@ from .models import (
     DepartmentMember,
     DoctorProfile,
     NurseProfile,
-    StaffMember,
-    StaffRole,
     StaffTransfer,
     TechnicianProfile,
     WorkloadAssignment,
@@ -28,8 +21,6 @@ from .serializers import (
     DepartmentSerializer,
     DoctorProfileSerializer,
     NurseProfileSerializer,
-    StaffMemberSerializer,
-    StaffRoleSerializer,
     StaffTransferSerializer,
     TechnicianProfileSerializer,
     WorkloadAssignmentSerializer,
@@ -40,7 +31,6 @@ from .utils.filters import (
     DepartmentFilter,
     DoctorProfileFilter,
     NurseProfileFilter,
-    StaffMemberFilter,
     StaffTransferFilter,
     TechnicianProfileFilter,
     WorkloadAssignmentFilter,
@@ -56,194 +46,187 @@ class DepartmentViewSet(BaseViewSet):
 
     queryset = Department.objects.select_related(
         "parent_department",
-        "hospital",
         "department_head"
     ).prefetch_related(
         "sub_departments",
         "staff_members"
     )
 
-    @extend_schema(
-        parameters=[
-            OpenApiParameter(name="active_only", type=bool, description="Filter only active staff")
-        ]
-    )
+    # @action(detail=True, methods=["get"])
+    # def staff_list(self, request, pk=None):
+    #     """Get list of staff members in department."""
+    #     try:
+    #         department = self.get_object()
+    #         # Get and parse active_only parameter
+    #         active_only_param = request.query_params.get("active_only", "true").strip('"')
+    #         # Convert to boolean more reliably
+    #         active_only = active_only_param.lower() in ["true", "1", "yes", "on"]
 
-    @action(detail=True, methods=["get"])
-    def staff_list(self, request, pk=None):
-        """Get list of staff members in department."""
-        try:
-            department = self.get_object()
-            # Get and parse active_only parameter
-            active_only_param = request.query_params.get("active_only", "true").strip('"')
-            # Convert to boolean more reliably
-            active_only = active_only_param.lower() in ["true", "1", "yes", "on"]
+    #         # Get department members through the correct relationship
+    #         department_members = department.staff_members.select_related("user")
 
-            # Get department members through the correct relationship
-            department_members = department.staff_members.select_related("user")
+    #         if active_only:
+    #             department_members = department_members.filter(user__is_active=True)
 
-            if active_only:
-                department_members = department_members.filter(user__is_active=True)
+    #         # Extract the StaffMember objects
+    #         staff = [member.user for member in department_members]
 
-            # Extract the StaffMember objects
-            staff = [member.user for member in department_members]
+    #         logger.info(f"Found {len(staff)} staff members")
+    #         serializer = StaffMemberSerializer(
+    #             staff,
+    #             many=True,
+    #             context={"request": request}
+    #         )
 
-            logger.info(f"Found {len(staff)} staff members")
-            serializer = StaffMemberSerializer(
-                staff,
-                many=True,
-                context={"request": request}
-            )
+    #         return APIResponse.success(
+    #             data=serializer.data,
+    #             message="Successfully retrieved department staff list",
+    #             extra={
+    #                 "total_count": len(staff),
+    #                 "department_name": department.name,
+    #                 "active_only": active_only,
+    #             }
+    #         )
+    #     except Exception as e:
+    #         return self.handle_exception(e)
 
-            return APIResponse.success(
-                data=serializer.data,
-                message="Successfully retrieved department staff list",
-                extra={
-                    "total_count": len(staff),
-                    "department_name": department.name,
-                    "active_only": active_only,
-                }
-            )
-        except Exception as e:
-            return self.handle_exception(e)
+    # @transaction.atomic
+    # def create(self, request, *args, **kwargs):  # Fixed argument spelling
+    #     user = request.user
+    #     try:
+    #         # Get hospital profile
+    #         try:
+    #             hospital_profile = HospitalProfile.objects.get(tenant=user.hospital)
+    #         except HospitalProfile.DoesNotExist as e:
+    #             return self.handle_exception(e)
 
-    @transaction.atomic
-    def create(self, request, *args, **kwargs):  # Fixed argument spelling
-        user = request.user
-        try:
-            # Get hospital profile
-            try:
-                hospital_profile = HospitalProfile.objects.get(tenant=user.hospital)
-            except HospitalProfile.DoesNotExist as e:
-                return self.handle_exception(e)
+    #         # Get department head
+    #         department_head_id = request.data.get("department_head")
+    #         if department_head_id:
+    #             try:
+    #                 department_head = StaffMember.objects.get(id=department_head_id)
+    #                 logger.info(f"Found department head: {department_head}")
+    #             except StaffMember.DoesNotExist as e:
+    #                 return self.handle_exception(e)
+    #         else:
+    #             department_head = None
 
-            # Get department head
-            department_head_id = request.data.get("department_head")
-            if department_head_id:
-                try:
-                    department_head = StaffMember.objects.get(id=department_head_id)
-                    logger.info(f"Found department head: {department_head}")
-                except StaffMember.DoesNotExist as e:
-                    return self.handle_exception(e)
-            else:
-                department_head = None
+    #         # Validate and save department
+    #         serializer = self.get_serializer(data=request.data)
+    #         if not serializer.is_valid():
+    #             return APIResponse.validation_error(serializer.errors)
 
-            # Validate and save department
-            serializer = self.get_serializer(data=request.data)
-            if not serializer.is_valid():
-                return APIResponse.validation_error(serializer.errors)
+    #         # Save department
+    #         instance = serializer.save(hospital=hospital_profile)
 
-            # Save department
-            instance = serializer.save(hospital=hospital_profile)
+    #         # Create department head assignment if provided
+    #         if department_head:
+    #             DepartmentMember.objects.create(
+    #                 department=instance,
+    #                 user=department_head,
+    #                 role="HEAD",
+    #                 start_date=now(),
+    #                 is_primary=True,
+    #                 schedule_pattern={"none":[]},
+    #                 emergency_contact="000000",
+    #                 time_allocation=100.0  # Added required field
+    #             )
 
-            # Create department head assignment if provided
-            if department_head:
-                DepartmentMember.objects.create(
-                    department=instance,
-                    user=department_head,
-                    role="HEAD",
-                    start_date=now(),
-                    is_primary=True,
-                    schedule_pattern={"none":[]},
-                    emergency_contact="000000",
-                    time_allocation=100.0  # Added required field
-                )
+    #         return APIResponse.success(
+    #             data=self.get_serializer(instance).data,
+    #             message="Department created successfully",
+    #             status_code=status.HTTP_201_CREATED
+    #         )
 
-            return APIResponse.success(
-                data=self.get_serializer(instance).data,
-                message="Department created successfully",
-                status_code=status.HTTP_201_CREATED
-            )
+    #     except Exception as e:
+    #         return self.handle_exception(e)
 
-        except Exception as e:
-            return self.handle_exception(e)
+# class StaffMemberViewSet(BaseViewSet):
+#     serializer_class = StaffMemberSerializer
+#     filterset_class = StaffMemberFilter
+#     search_fields = ["first_name", "last_name", "email"]
+#     ordering_fields = ["first_name", "last_name", "created_at"]
 
-class StaffMemberViewSet(BaseViewSet):
-    serializer_class = StaffMemberSerializer
-    filterset_class = StaffMemberFilter
-    search_fields = ["first_name", "last_name", "email"]
-    ordering_fields = ["first_name", "last_name", "created_at"]
+#     queryset = StaffMember.objects.select_related(
+#         "hospital",
+#         "role"
+#     ).prefetch_related(
+#         "department_memberships__department",
+#         "role__permissions"
+#     )
 
-    queryset = StaffMember.objects.select_related(
-        "hospital",
-        "role"
-    ).prefetch_related(
-        "department_memberships__department",
-        "role__permissions"
-    )
+#     @action(detail=True, methods=["post"])
+#     @transaction.atomic
+#     def assign_to_department(self, request, pk=None):
+#         """Assign staff member to a department."""
+#         try:
+#             staff_member = self.get_object()
+#             serializer = DepartmentMemberSerializer(data=request.data)
 
-    @action(detail=True, methods=["post"])
-    @transaction.atomic
-    def assign_to_department(self, request, pk=None):
-        """Assign staff member to a department."""
-        try:
-            staff_member = self.get_object()
-            serializer = DepartmentMemberSerializer(data=request.data)
+#             if not serializer.is_valid():
+#                 return APIResponse.validation_error(serializer.errors)
 
-            if not serializer.is_valid():
-                return APIResponse.validation_error(serializer.errors)
+#             instance = serializer.save(user=staff_member)
+#             return APIResponse.success(
+#                 data=serializer.data,
+#                 message="Staff member successfully assigned to department",
+#                 status_code=status.HTTP_201_CREATED,
+#                 extra={
+#                     "department_name": instance.department.name,
+#                     "staff_name": staff_member.get_full_name()
+#                 }
+#             )
+#         except Exception as e:
+#             return self.handle_exception(e)
 
-            instance = serializer.save(user=staff_member)
-            return APIResponse.success(
-                data=serializer.data,
-                message="Staff member successfully assigned to department",
-                status_code=status.HTTP_201_CREATED,
-                extra={
-                    "department_name": instance.department.name,
-                    "staff_name": staff_member.get_full_name()
-                }
-            )
-        except Exception as e:
-            return self.handle_exception(e)
+#     @action(detail=True, methods=["get"])
+#     @transaction.atomic
+#     def schedule(self, request, pk=None):
+#         """Get staff member's schedule."""
+#         try:
+#             staff_member = self.get_object()
+#             profile = staff_member.staff_profile
 
-    @action(detail=True, methods=["get"])
-    @transaction.atomic
-    def schedule(self, request, pk=None):
-        """Get staff member's schedule."""
-        try:
-            staff_member = self.get_object()
-            profile = staff_member.staff_profile
+#             if not profile:
+#                 return APIResponse.not_found(
+#                     message="Staff profile not found",
+#                     resource_type="Staff Profile"
+#                 )
 
-            if not profile:
-                return APIResponse.not_found(
-                    message="Staff profile not found",
-                    resource_type="Staff Profile"
-                )
+#             schedule_data = getattr(profile, "availability", None) or getattr(profile, "shift_preferences", {})
+#             return APIResponse.success(
+#                 data=schedule_data,
+#                 message="Successfully retrieved staff schedule",
+#                 extra={"staff_name": staff_member.get_full_name()}
+#             )
+#         except Exception as e:
+#             return self.handle_exception(e)
 
-            schedule_data = getattr(profile, "availability", None) or getattr(profile, "shift_preferences", {})
-            return APIResponse.success(
-                data=schedule_data,
-                message="Successfully retrieved staff schedule",
-                extra={"staff_name": staff_member.get_full_name()}
-            )
-        except Exception as e:
-            return self.handle_exception(e)
+# class StaffRoleViewSet(BaseViewSet):
+#     serializer_class = StaffRoleSerializer
+#     queryset = StaffRole.objects.prefetch_related("permissions")
 
-class StaffRoleViewSet(BaseViewSet):
-    serializer_class = StaffRoleSerializer
-    queryset = StaffRole.objects.prefetch_related("permissions")
+#     @action(detail=True, methods=["post"])
+#     @transaction.atomic
+#     def assign_permissions(self, request, pk=None):
+#         """Assign permissions to role."""
+#         try:
+#             role = self.get_object()
+#             permissions = request.data.get("permissions", [])
 
-    @action(detail=True, methods=["post"])
-    @transaction.atomic
-    def assign_permissions(self, request, pk=None):
-        """Assign permissions to role."""
-        try:
-            role = self.get_object()
-            permissions = request.data.get("permissions", [])
+#             if not permissions:
+#                 raise BusinessLogicError(
+#                     message="No permissions provided",
+#                     error_code="NO_PERMISSIONS"
+#                 )
 
-            if not permissions:
-                raise BusinessLogicError(
-                    message="No permissions provided",
-                    error_code="NO_PERMISSIONS"
-                )
-
-            role.permissions.set(permissions)
-            return APIResponse.success(
-                data=self.get_serializer(role).data,
-                message="Permissions successfully assigned to role"
-            )
-        except Exception as e:
-            return self.handle_exception(e)
+#             role.permissions.set(permissions)
+#             return APIResponse.success(
+#                 data=self.get_serializer(role).data,
+#                 message="Permissions successfully assigned to role"
+#             )
+#         except Exception as e:
+#             return self.handle_exception(e)
 class BaseProfileViewSet(BaseViewSet):
     ordering_fields = ["years_of_experience", "qualification"]
 
@@ -318,44 +301,44 @@ class DepartmentMemberViewSet(BaseViewSet):
     serializer_class = DepartmentMemberSerializer
     queryset = DepartmentMember.objects.select_related("department", "user")
 
-    @transaction.atomic
-    def create(self, request, *args, **kwargs):
-        try:
-            try:
-                department = Department.objects.get(id=request.data.get("department"))
-                logger.info(f"Found department: {department}")
-            except Department.DoesNotExist as e:
-                return self.handle_exception(e)
+    # @transaction.atomic
+    # def create(self, request, *args, **kwargs):
+    #     try:
+    #         try:
+    #             department = Department.objects.get(id=request.data.get("department"))
+    #             logger.info(f"Found department: {department}")
+    #         except Department.DoesNotExist as e:
+    #             return self.handle_exception(e)
 
-            # Validate the user exists
-            try:
-                StaffMember.objects.get(id=request.data.get("user"))
-            except StaffMember.DoesNotExist as e:
-                return self.handle_exception(e)
+    #         # Validate the user exists
+    #         try:
+    #             StaffMember.objects.get(id=request.data.get("user"))
+    #         except StaffMember.DoesNotExist as e:
+    #             return self.handle_exception(e)
 
-            serializer = self.get_serializer(data=request.data)
+    #         serializer = self.get_serializer(data=request.data)
 
-            # Validate serializer data with detailed error logging
-            if not serializer.is_valid():
-                return Response(
-                    serializer.errors,
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+    #         # Validate serializer data with detailed error logging
+    #         if not serializer.is_valid():
+    #             return Response(
+    #                 serializer.errors,
+    #                 status=status.HTTP_400_BAD_REQUEST
+    #             )
 
-            # Attempt to save with exception handling
-            try:
-                serializer.save()
-                return self.success(
-                    data=serializer.data,
-                    message=f"Successfully created {self.basename}",
-                    status_code=status.HTTP_201_CREATED
-                )
-            except Exception as e:
-                return self.handle_exception(e)
+    #         # Attempt to save with exception handling
+    #         try:
+    #             serializer.save()
+    #             return self.success(
+    #                 data=serializer.data,
+    #                 message=f"Successfully created {self.basename}",
+    #                 status_code=status.HTTP_201_CREATED
+    #             )
+    #         except Exception as e:
+    #             return self.handle_exception(e)
 
-        except Exception as e:
-           logger.exception(f"Unexpected error in end_assignment: {e!s}")
-           return self.handle_exception(e)
+    #     except Exception as e:
+    #        logger.exception(f"Unexpected error in end_assignment: {e!s}")
+    #        return self.handle_exception(e)
 
 
     @action(detail=True, methods=["get"])

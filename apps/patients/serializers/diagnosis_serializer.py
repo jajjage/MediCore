@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.patients.models import (
-    PatientDiagnosis,
+    PatientDiagnoses,
 )
 
 from .base_serializer import BasePatientSerializer
@@ -13,7 +13,7 @@ class PatientDiagnosisSerializer(BasePatientSerializer):
     """
 
     class Meta:
-        model = PatientDiagnosis
+        model = PatientDiagnoses
         fields = [
             "id",
             "patient",
@@ -31,11 +31,11 @@ class PatientDiagnosisSerializer(BasePatientSerializer):
     def validate(self, data):
         """Validate diagnosis data and permissions."""
         if self.instance:
-            if not self.check_permission("change", "patientdiagnosis"):
+            if not self.check_permission("change", "patientdiagnoses"):
                 raise serializers.ValidationError(
                     {"error": "You don't have permission to update diagnoses"}
                 )
-        elif not self.check_permission("add", "patientdiagnosis"):
+        elif not self.check_permission("add", "patientdiagnoses"):
             raise serializers.ValidationError(
                 {"error": "You don't have permission to add diagnoses"}
             )

@@ -1,6 +1,7 @@
 import uuid
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
@@ -35,13 +36,13 @@ class DepartmentMember(models.Model):
     department = models.ForeignKey(
         Department,
         on_delete=models.CASCADE,
-        related_name="staff_members",
+        related_name="department_members",
         help_text=_("Department the staff member belongs to")
     )
     user = models.ForeignKey(
-        "staff.StaffMember",
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="department_memberships",
+        related_name="department_members",
         help_text=_("User assigned to the department")
     )
     role = models.CharField(
@@ -135,7 +136,7 @@ class DepartmentMember(models.Model):
             return
         print("clean get called")
         self._validate_dates()
-        self._validate_hospital()
+        # self._validate_hospital()
         self._validate_role_changes()
         self._validate_workload()
         self._validate_overlapping_assignments()
@@ -155,10 +156,10 @@ class DepartmentMember(models.Model):
                     _("Staff member already has an active department assignment")
                 )
 
-    def _validate_hospital(self):
-        print("_validate_hospital")
-        if self.user_id and self.department_id and self.user.hospital_id != self.department.hospital_id:
-            raise ValidationError("User and department must belong to the same hospital")
+    # def _validate_hospital(self):
+    #     print("_validate_hospital")
+    #     if self.user_id and self.department_id and self.user.hospital_id != self.department.hospital_id:
+    #         raise ValidationError("User and department must belong to the same hospital")
 
 
     def _validate_dates(self):

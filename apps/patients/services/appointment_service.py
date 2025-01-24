@@ -12,7 +12,8 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from apps.staff.models import DepartmentMember, StaffMember
+from apps.staff.models import DepartmentMember
+from apps.staff.models.staff_profile import DoctorProfile
 
 # Type Aliases for better type hinting
 DateTimeRange: TypeAlias = tuple[datetime, datetime]
@@ -440,7 +441,7 @@ class AppointmentService:
     ) -> dict:
         """Check physician availability for a time range."""
         try:
-            physician = StaffMember.objects.get(
+            physician = DoctorProfile.objects.get(
                 id=physician_id,
                 role__name="Doctor",
                 is_active=True
@@ -492,7 +493,7 @@ class AppointmentService:
                 "message": "Physician is available"
             }
 
-        except StaffMember.DoesNotExist:
+        except DoctorProfile.DoesNotExist:
             return {
                 "available": False,
                 "message": "Physician not found or inactive"
@@ -696,7 +697,7 @@ class AppointmentService:
     ) -> dict[str, list[Any]]:
         """Get schedule for all physicians in a department for a specific date."""
         schedule = {}
-        physicians = StaffMember.objects.filter(
+        physicians = DoctorProfile.objects.filter(
             departments__id=department_id,
             role__name="Doctor",
             is_active=True

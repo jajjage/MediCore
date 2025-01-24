@@ -1,78 +1,44 @@
 import logging
 
 from django.conf import settings
-from django.contrib import messages
-from django.contrib.auth import logout
+from django.core.cache import cache
 from django.db import connection
-from django.shortcuts import redirect
-from django.urls import reverse
-from django_tenants.utils import get_public_schema_name, schema_context
+
+from tenants.models import Client
 
 logger = logging.getLogger(__name__)
 
-
-class AdminAccessMiddleware:
+class SubdomainTenantMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
+        self.main_domain = settings.BASE_DOMAIN
 
     def __call__(self, request):
-        if request.path.startswith("/admin/"):
-            user = request.user
+        host = request.get_host().split(":")[0].lower()
+        schema_name = connection.schema_name
 
-            # If not authenticated, allow normal login flow
-            if not user.is_authenticated:
-                return self.get_response(request)
+        if self.main_domain in host:
+            subdomain = host.lower()
 
-            current_schema = connection.schema_name
+            # Check cache first
+            cached_domains = cache.get("active_subdomains_dict") or {}
 
-            if current_schema == get_public_schema_name():
-                # On main domain
-                if not user.is_superuser:
-                    messages.error(
-                        request, "Access denied. Please log in to your hospital domain."
-                    )
-                    logout(request)
-                    return redirect(reverse("admin:login"))
-            # On tenant domain
-            elif not user.hospital or user.hospital.schema_name != current_schema:
-                messages.error(
-                    request,
-                    "Access denied. Please log in to your assigned hospital domain.",
-                )
-                logout(request)
-                return redirect(reverse("admin:login"))
-
-        return self.get_response(request)
-
-
-class DynamicAuthModelMiddleware:
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        if connection.schema_name == "public":
-            settings.AUTH_USER_MODEL = settings.PUBLIC_SCHEMA_USER_MODEL
+            print(cached_domains)
+            if schema_name in cached_domains:
+                subdomain = cached_domains[schema_name]
+            else:
+                try:
+                    schema = Client.objects.get(schema_name=schema_name)
+                    client = schema.domains.get(domain=subdomain)
+                    self._update_cache(client)
+                except Client.DoesNotExist:
+                    request.tenant = None
         else:
-            settings.AUTH_USER_MODEL = settings.TENANT_SCHEMA_USER_MODEL
+            request.tenant = None
+
         return self.get_response(request)
 
-class PublicSchemaMiddleware:
-    """
-    Middleware to ensure the public schema is used when accessing.
-
-    routes not associated with a specific tenant.
-    """
-
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        # If the request is for the root domain (no tenant subdomain)
-        if request.get_host() == "medicore.local:8000":
-            # Switch to the public schema
-            with schema_context("public"):
-                response = self.get_response(request)
-                return response
-
-        # For other routes, use the default tenant logic
-        return self.get_response(request)
+    def _update_cache(self, client):
+        cached_domains = cache.get("active_subdomains_dict") or {}
+        cached_domains[client.tenant.schema_name] = client.domain
+        cache.set("active_subdomains_dict", cached_domains, timeout=3600)

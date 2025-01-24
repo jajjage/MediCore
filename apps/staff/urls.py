@@ -5,8 +5,7 @@ from . import views
 
 router = DefaultRouter()
 router.register("departments", views.DepartmentViewSet, basename="department")
-router.register("staff-members", views.StaffMemberViewSet, basename="staff-member")
-router.register("staff-roles", views.StaffRoleViewSet, basename="staff-role")
+# router.register("staff-members", views.StaffMemberViewSet, basename="staff-member")
 router.register("department-members", views.DepartmentMemberViewSet, basename="department-member")
 router.register("workload-assignments", views.WorkloadAssignmentViewSet, basename="workload-assignment")
 router.register("staff-transfers", views.StaffTransferViewSet, basename="staff-transfer")

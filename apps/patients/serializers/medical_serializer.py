@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.patients.models import (
     PatientAllergies,
-    PatientChronicConditions,
+    PatientChronicCondition,
 )
 
 from .base_serializer import BasePatientSerializer
@@ -29,7 +29,7 @@ class PatientChronicConditionSerializer(BasePatientSerializer):
     """Serializer for patient chronic conditions."""
 
     class Meta:
-        model = PatientChronicConditions
+        model = PatientChronicCondition
         fields = ["id", "condition", "diagnosis_date", "notes"]
         read_only_fields = ["id"]
 

@@ -1,21 +1,16 @@
-import uuid
 
 from django.db import models
-from simple_history.models import HistoricalRecords
 
-from .core import Patient
+from .core import Basemodel
 
 
-class PatientVisit(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="visits")
+class PatientVisit(Basemodel):
     visit_date = models.DateTimeField(db_index=True)
     physician = models.CharField(max_length=100, blank=True, null=True)
     ward_or_clinic = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     discharge_date = models.DateTimeField(blank=True, null=True, db_index=True)
     discharge_notes = models.TextField(blank=True, null=True)
     referred_by = models.CharField(max_length=255, blank=True, null=True)
-    history = HistoricalRecords(user_model="staff.StaffMember")
 
     class Meta:
         db_table="patient_visits"

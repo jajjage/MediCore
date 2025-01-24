@@ -1,18 +1,19 @@
-import uuid
 
 from django.db import models
 
+from .core import Basemodel
 
-class PatientPrescription(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    appointment = models.OneToOneField(
-        "PatientAppointment", on_delete=models.CASCADE, related_name="prescription"
-    )
+
+class PatientPrescription(Basemodel):
     issued_by = models.ForeignKey(
-        "staff.StaffMember",
+        "staff.DoctorProfile",
         on_delete=models.CASCADE,
         related_name="issued_prescriptions",
-        limit_choices_to={"role__name": "Doctor"},
+    )
+    appointment = models.ForeignKey(
+        "patients.PatientAppointment",
+        on_delete=models.CASCADE,
+        related_name="prescriptions",
     )
     medicines = models.TextField()
     instructions = models.TextField(blank=True, null=True)

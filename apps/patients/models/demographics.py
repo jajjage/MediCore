@@ -1,17 +1,10 @@
-import uuid
 
 from django.db import models
-from simple_history.models import HistoricalRecords
 
-from .core import Patient
+from .core import Basemodel
 
 
-class PatientDemographics(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    patient = models.OneToOneField(
-        Patient, on_delete=models.CASCADE, related_name="demographics"
-    )
-    history = HistoricalRecords(user_model="staff.StaffMember")
+class PatientDemographics(Basemodel):
     blood_type = models.CharField(max_length=5, blank=True, null=True)
     height_cm = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
     weight_kg = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)

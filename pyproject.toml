@@ -128,8 +128,10 @@ ignore = [
     "G004",     #JKFJKF
     "RET506",   #
     "TRY300",   #
-    "B904",     #
+    "B904",     # 
     "DTZ007",   # Date time zone
+    "N806",     # Variable in function should be lowercase
+    "ARG001",   #
 ]
 
 [tool.ruff.lint.per-file-ignores]

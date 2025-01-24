@@ -1,32 +1,13 @@
 # models/staff_profiles.py
-import uuid
 
 from django.db import models
 
+from .core import StaffProfile
 
-class StaffProfile(models.Model):
-    """Base model for all staff profiles."""
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    qualification = models.CharField(max_length=255)
-    years_of_experience = models.PositiveIntegerField()
-    certification_number = models.CharField(max_length=100, blank=True)
-    specialty_notes = models.TextField(blank=True)
-    emergency_response_qualified = models.BooleanField(default=False)
-    shift_preferences = models.JSONField(default=dict)
-    max_continuous_hours = models.IntegerField(default=12)
-
-    class Meta:
-        abstract = True
 
 class DoctorProfile(StaffProfile):
     """Profile specific to doctors."""
 
-    staff_member = models.OneToOneField(
-        "StaffMember",
-        on_delete=models.CASCADE,
-        related_name="doctor_profile"
-    )
     specialization = models.CharField(max_length=100)
     license_number = models.CharField(max_length=50, unique=True)
     availability = models.JSONField(
@@ -47,11 +28,6 @@ class DoctorProfile(StaffProfile):
 class NurseProfile(StaffProfile):
     """Profile specific to nurses."""
 
-    staff_member = models.OneToOneField(
-        "StaffMember",
-        on_delete=models.CASCADE,
-        related_name="nurse_profile"
-    )
     nurse_license = models.CharField(max_length=50, unique=True)
     ward_specialty = models.CharField(max_length=100)
     class Meta:
@@ -60,11 +36,6 @@ class NurseProfile(StaffProfile):
 class TechnicianProfile(StaffProfile):
     """Profile specific to technicians."""
 
-    staff_member = models.OneToOneField(
-        "StaffMember",
-        on_delete=models.CASCADE,
-        related_name="technician_profile"
-    )
     technician_license = models.CharField(max_length=50, unique=True)
     equipment_specialties = models.JSONField(
         default=list,

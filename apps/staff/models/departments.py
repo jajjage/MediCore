@@ -1,6 +1,6 @@
 import uuid
 
-from django.core.exceptions import ValidationError
+from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -54,14 +54,6 @@ class Department(models.Model):
         help_text=_("Parent department if this is a sub-department")
     )
 
-    # Hospital Association
-    hospital = models.ForeignKey(
-        "hospital.HospitalProfile",
-        on_delete=models.CASCADE,
-        related_name="departments",
-        help_text=_("Hospital this department belongs to")
-    )
-
     min_staff_per_shift = models.IntegerField(default=0)
     emergency_min_staff = models.IntegerField(default=0)
     minimum_staff_required = models.IntegerField(default=0)
@@ -92,7 +84,7 @@ class Department(models.Model):
 
     # Department Head
     department_head = models.ForeignKey(
-        "staff.StaffMember",
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -118,9 +110,9 @@ class Department(models.Model):
 
     class Meta:
         db_table = "department"
-        unique_together = ["code", "hospital"]
+        unique_together = ["code", "name"]
         indexes = [
-            models.Index(fields=["name", "hospital", "is_active"]),
+            models.Index(fields=["name",  "is_active"]),
             models.Index(fields=["department_head"]),
         ]
         constraints = [
@@ -134,17 +126,17 @@ class Department(models.Model):
         verbose_name_plural = _("Departments")
 
     def __str__(self):
-        return f"{self.name} - {self.hospital.hospital_name}"
+        return f"{self.name} ({self.code})"
 
-    def clean(self):
-        """Validate department data."""
-        # Only validate if both fields are set
-        if self.parent_department and self.hospital and self.parent_department.hospital != self.hospital:
-            raise ValidationError({
-                "parent_department": _("Parent department must belong to the same hospital")
-            })
+    # def clean(self):
+    #     """Validate department data."""
+    #     # Only validate if both fields are set
+    #     if self.parent_department and self.hospital and self.parent_department.hospital != self.hospital:
+    #         raise ValidationError({
+    #             "parent_department": _("Parent department must belong to the same hospital")
+    #         })
 
-    def save(self, *args, **kwargs):  # noqa: DJ012
+    def save(self, *args, **kwargs):
         skip_validation = kwargs.pop("skip_validation", False)
         if not skip_validation:
             self.full_clean()
@@ -153,11 +145,11 @@ class Department(models.Model):
 
     def get_staff_count(self):
         """Return total staff in department."""
-        return self.staff_members.count()
+        return self.department_members.count()
 
     def get_active_staff(self):
         """Return only active staff."""
-        return self.staff_members.filter(is_active=True)
+        return self.department_members.filter(is_active=True)
 
     def get_sub_departments(self):
         """Return all sub-departments."""
