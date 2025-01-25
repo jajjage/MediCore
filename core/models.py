@@ -25,6 +25,7 @@ class MyUserManager(BaseUserManager):
         user = self.model(
             email=self.normalize_email(email),
             is_superuser=True,
+            is_staff=True
         )
         user.set_password(password)
         user.save(using=self._db)
@@ -46,8 +47,6 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    user_permissions = None
-    groups = None
 
     objects = MyUserManager()
 
@@ -88,6 +87,7 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
         has_access = self.hospital_memberships_user.filter(
             tenant__schema_name=schema_name
         ).exists()
+        print(has_access)
 
         cache.set(cache_key, has_access, 300)  # Cache for 5 minutes
         return has_access
@@ -124,8 +124,8 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
             perms = set()
 
             # Get permissions from groups
-            # for group in membership.role.groups.all():
-            #     perms.update(group.permissions.values_list("codename", flat=True))
+            for group in membership.role.groups.all():
+                perms.update(group.permissions.values_list("codename", flat=True))
 
             cache.set(cache_key, perms, 300)
             return perms
@@ -145,3 +145,7 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
             return super().has_perm(perm, obj)
 
         return perm in self.get_tenant_permissions(tenant_schema)
+
+    @property
+    def current_tenant_membership(self):
+       pass

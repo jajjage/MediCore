@@ -1,12 +1,14 @@
 # tenants/management/commands/create_tenant.py
 
-from django.core.management.base import BaseCommand
+import uuid
+from datetime import datetime, timedelta
+
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand
 from django_tenants.utils import schema_context
+
 from hospital.models import HospitalProfile
 from tenants.models import Client, Domain
-from datetime import datetime, timedelta
-import uuid
 
 User = get_user_model()
 
@@ -109,5 +111,5 @@ class Command(BaseCommand):
             )
 
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Error creating tenant: {str(e)}"))
+            self.stdout.write(self.style.ERROR(f"Error creating tenant: {e!s}"))
             raise

@@ -136,7 +136,6 @@ class DepartmentMember(models.Model):
             return
         print("clean get called")
         self._validate_dates()
-        # self._validate_hospital()
         self._validate_role_changes()
         self._validate_workload()
         self._validate_overlapping_assignments()
@@ -155,12 +154,6 @@ class DepartmentMember(models.Model):
                 raise ValidationError(
                     _("Staff member already has an active department assignment")
                 )
-
-    # def _validate_hospital(self):
-    #     print("_validate_hospital")
-    #     if self.user_id and self.department_id and self.user.hospital_id != self.department.hospital_id:
-    #         raise ValidationError("User and department must belong to the same hospital")
-
 
     def _validate_dates(self):
         print("_validate_dates")

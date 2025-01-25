@@ -49,3 +49,4 @@ class CreateTenantRequestSerializer(serializers.Serializer):
     address = serializers.CharField(required=False, allow_blank=True)
     specialty = serializers.CharField(required=False, allow_blank=True)
     bed_capacity = serializers.IntegerField(required=False, allow_null=True)
+

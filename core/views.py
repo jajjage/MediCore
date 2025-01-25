@@ -25,7 +25,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
                 if user:
                     update_last_login(None, user)
                     return self.set_token_cookies(response)
-            return response  # noqa: TRY300
+            return response
         except (TokenError, ValidationError) as e:
             logger.exception("Token generation failed: %s", e)
             return Response(
@@ -45,7 +45,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
 
     def set_token_cookies(self, response):
         try:
-            logger.debug(f"Setting cookies with data: {response.data}")  # noqa: G004
+            logger.debug(f"Setting cookies with data: {response.data}")
             self._validate_token_data(response.data)
             # Set access token cookie
             response.set_cookie(
@@ -70,9 +70,10 @@ class CookieTokenObtainPairView(TokenObtainPairView):
             )
 
             # Remove tokens from response data for security
-            response.data = {"detail": "Login successful"}
+            response.data.pop("access")
+            response.data.pop("refresh")
             logger.info("Cookies set successfully")
-            return response  # noqa: TRY300
+            return response
 
         except Exception as e:
             logger.exception("Failed to set cookies: %s", e)
@@ -187,7 +188,7 @@ class LogoutView(APIView):
             response = Response({"detail": "Successfully logged out."})
             response.delete_cookie(settings.JWT_AUTH_COOKIE)
             response.delete_cookie(settings.JWT_AUTH_REFRESH_COOKIE)
-            return response  # noqa: TRY300
+            return response
         except Exception as e:
             logger.error("Logout error: %s", e, exc_info=True)  # noqa: G201
             return Response(

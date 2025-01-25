@@ -128,14 +128,6 @@ class Department(models.Model):
     def __str__(self):
         return f"{self.name} ({self.code})"
 
-    # def clean(self):
-    #     """Validate department data."""
-    #     # Only validate if both fields are set
-    #     if self.parent_department and self.hospital and self.parent_department.hospital != self.hospital:
-    #         raise ValidationError({
-    #             "parent_department": _("Parent department must belong to the same hospital")
-    #         })
-
     def save(self, *args, **kwargs):
         skip_validation = kwargs.pop("skip_validation", False)
         if not skip_validation:

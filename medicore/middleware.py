@@ -23,13 +23,13 @@ class SubdomainTenantMiddleware:
             # Check cache first
             cached_domains = cache.get("active_subdomains_dict") or {}
 
-            print(cached_domains)
             if schema_name in cached_domains:
                 subdomain = cached_domains[schema_name]
             else:
                 try:
                     schema = Client.objects.get(schema_name=schema_name)
                     client = schema.domains.get(domain=subdomain)
+
                     self._update_cache(client)
                 except Client.DoesNotExist:
                     request.tenant = None

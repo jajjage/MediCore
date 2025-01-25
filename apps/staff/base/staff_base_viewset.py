@@ -10,12 +10,14 @@ from rest_framework.exceptions import (
 )
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
+from apps.patients.permissions import RolePermission
 from apps.staff.utils.exceptions import BusinessLogicError
 from apps.staff.utils.response_handlers import APIResponse
 
 logger = logging.getLogger(__name__)
 
 class BaseViewSet(viewsets.ModelViewSet, APIResponse):
+    permission_classes = [RolePermission]
     filter_backends = [
         django_filters.DjangoFilterBackend,
         filters.SearchFilter,

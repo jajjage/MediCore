@@ -28,10 +28,13 @@ class PatientViewSet(BasePatientViewSet):
     serializer_class = CompletePatientSerializer
 
     def get_queryset(self):
-        return Patient.objects.select_related(
-            "demographics", "emergency_contact"
-        ).prefetch_related(
-            "addresses", "allergies", "chronic_conditions", "medical_reports"
+        return Patient.objects.prefetch_related(
+            "addresses",
+            "demographics",
+            "emergency_contact",
+            "allergies",
+            "chronic_conditions",
+            "medical_reports"
         )
 
 
