@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from apps.patients.models.core import Patient
-from apps.patients.permissions import RolePermission
+from base_permission.view_permission import RolePermission
 
 # Base Classes and Mixins
 

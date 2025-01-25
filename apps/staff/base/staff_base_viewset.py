@@ -10,9 +10,9 @@ from rest_framework.exceptions import (
 )
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
-from apps.patients.permissions import RolePermission
 from apps.staff.utils.exceptions import BusinessLogicError
 from apps.staff.utils.response_handlers import APIResponse
+from base_permission.view_permission import RolePermission
 
 logger = logging.getLogger(__name__)
 
