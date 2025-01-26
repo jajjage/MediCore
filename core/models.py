@@ -37,6 +37,7 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     tenant = models.ManyToManyField("tenants.Client", through="hospital.HospitalMembership", related_name="users")
     first_name = models.CharField(max_length=150, blank=True)
+    middle_name = models.CharField(max_length=150, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
 
@@ -146,6 +147,8 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
 
         return perm in self.get_tenant_permissions(tenant_schema)
 
-    @property
-    def current_tenant_membership(self):
-       pass
+    def is_patient(self):
+        return self.hospital_memberships.filter(role="Patient").exists()
+
+    def is_staff_member(self):
+        return self.hospital_memberships.filter(role__in=["Doctor", "Durse", "Admin", "Tenant Admin"]).exists()

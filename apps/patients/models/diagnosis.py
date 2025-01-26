@@ -1,10 +1,11 @@
 
 from django.db import models
 
-from .core import Basemodel
+from .core import PatientBasemodel
 
 
-class PatientDiagnoses(Basemodel):
+class PatientDiagnoses(PatientBasemodel):
+    patient = models.ForeignKey("Patient", on_delete=models.CASCADE, related_name="diagnoses")
     diagnosis_date = models.DateField()
     diagnosis_name = models.CharField(max_length=255)
     icd_code = models.CharField(max_length=20, blank=True, null=True)

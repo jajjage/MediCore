@@ -18,11 +18,13 @@ class HospitalMembership(SoftDeleteModel):
         "tenants.Client",
         on_delete=models.CASCADE,
         related_name="hospital_memberships_tenant")
+
     hospital_profile = models.ForeignKey(
         "hospital.HospitalProfile",
         on_delete=models.CASCADE,
         related_name="hospital_memberships_profile",
         null=True)
+
     role = models.ForeignKey(
         "hospital.Role",
         on_delete=models.PROTECT,
@@ -37,11 +39,19 @@ class HospitalMembership(SoftDeleteModel):
 
     class Meta:
         db_table = "hospital_memberships"
-        unique_together = ["user", "hospital_profile", "tenant"]
+        unique_together = [
+            ("user", "hospital_profile", "tenant"),
+            ("user", "tenant", "role")  # Prevent duplicate roles in same tenant]
+        ]
         indexes = [
             models.Index(fields=["tenant", "role", "is_deleted"]),
             models.Index(fields=["user", "hospital_profile", "is_tenant_admin"]),
             models.Index(fields=["created_at", "is_deleted"]),
+        ]
+
+        permissions = [
+        ("generate_patient_pin", "Can generate patient PINs")
+
         ]
 
     def delete(self, hard_delete=None):

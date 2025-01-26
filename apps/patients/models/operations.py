@@ -2,10 +2,10 @@
 from django.db import models
 from django.utils import timezone
 
-from .core import Basemodel
+from .core import PatientBasemodel
 
 
-class PatientOperation(Basemodel):
+class PatientOperation(PatientBasemodel):
     STATUS_CHOICES = [
         ("pending", "Pending"),
         ("approved", "Approved"),
@@ -14,6 +14,12 @@ class PatientOperation(Basemodel):
         ("cancelled", "Cancelled"),
     ]
 
+    patient = models.ForeignKey(
+        "patients.Patient",
+        on_delete=models.CASCADE,
+        related_name="operations",
+        db_index=True
+    )
     surgeon = models.ForeignKey(
         "staff.DoctorProfile",
         on_delete=models.CASCADE,
@@ -32,10 +38,6 @@ class PatientOperation(Basemodel):
         default="pending",
         db_index=True
     )
-    created_at = models.DateTimeField(default=timezone.now)  # Changed to have a default
-    updated_at = models.DateTimeField(default=timezone.now)  # Changed to have a default
-
-
     class Meta:
         db_table = "patient_operations"
         indexes = [
@@ -48,8 +50,8 @@ class PatientOperation(Basemodel):
         return f"Operation: {self.operation_name} for {self.patient.first_name}"
 
     def save(self, *args, **kwargs):
-        # if self.operation_code:
-        #     self.operation_code = self.operation_code.upper()
+        if self.operation_code:
+            self.operation_code = self.operation_code.upper()
         if not self.pk:  # If creating a new object
             self.created_at = timezone.now()
         self.updated_at = timezone.now()

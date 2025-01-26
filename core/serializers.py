@@ -14,11 +14,11 @@ class CustomTokenObtainSerializer(TokenObtainPairSerializer):
         # Add custom claims to the JWT payload
         memberships = HospitalMembership.objects.filter(user=user).select_related("role")
         token["roles"] = [
-            membership.role.code if membership.role and membership.role.code else "UNKNOWN"
+            membership.role.code if membership.role and membership.role.name else "UNKNOWN"
             for membership in memberships
         ]
 
-        token["primary_role"] = memberships.first().role.code if memberships.exists() else None
+        token["primary_role"] = memberships.first().role.name if memberships.exists() else None
 
         return token
 
@@ -29,7 +29,7 @@ class CustomTokenObtainSerializer(TokenObtainPairSerializer):
         data["user"] = {
             "id": self.user.id,
             "email": self.user.email,
-            "roles": [membership.role.code for membership in self.user.hospital_memberships_user.all()]
+            "roles": [membership.role.name for membership in self.user.hospital_memberships_user.all()]
         }
         return data
 

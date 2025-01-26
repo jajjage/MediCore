@@ -45,12 +45,12 @@ def generate_schema_name(hospital_name: str, max_length: int = 63) -> str:
 
 class TenantCreationService:
     @staticmethod
-    def add_initial_member(staff, tenant, hospital_profile):
+    def add_initial_member(member, tenant, hospital_profile):
         """Add initial member for the tenant admin."""
         # Create admin permission for the tenant
-        role = Role.objects.get(name="Administrator")
+        role = Role.objects.get(name="Tenant Admin")
         hospital_membership = HospitalMembership.objects.create(
-            user=staff,
+            user=member,
             tenant=tenant,
             hospital_profile=hospital_profile,
             role=role,
@@ -81,7 +81,7 @@ class TenantCreationService:
         Domain.objects.create(domain=domain_name, tenant=tenant, is_primary=True)
 
         # Create admin user
-        staff = user_model.objects.create_user(
+        member = user_model.objects.create_user(
             email=validated_data["admin_email"],
             password=validated_data["admin_password"],
             first_name=validated_data["admin_first_name"],
@@ -89,11 +89,11 @@ class TenantCreationService:
             phone_number=validated_data["admin_phone_number"],
             is_staff=True,
         )
-
         # Create hospital profile
         hospital_profile = HospitalProfile.objects.create(
             tenant=tenant,
             hospital_name=validated_data["hospital_name"],
+            hospital_code=validated_data["hospital_code"],
             license_number=validated_data["license_number"],
             contact_email=validated_data["contact_email"],
             contact_phone=validated_data["contact_phone"],
@@ -104,65 +104,7 @@ class TenantCreationService:
         )
         # Setup initial permissions
 
-        TenantCreationService.add_initial_member(staff, tenant, hospital_profile)
+        TenantCreationService.add_initial_member(member, tenant, hospital_profile)
 
         return hospital_profile
 
-    @staticmethod
-    @transaction.atomic
-    def add_user_to_tenant(user, tenant, hospital_profile = None, role="VIEWER"):
-        """
-        Add a user to a tenant with specified permissions.
-
-        Args:
-            user: The user to add
-            tenant: The tenant to add the user to
-            role: The type of permission to grant (ADMIN, STAFF, or VIEWER)
-            hospital_profile: The hospital profile
-
-        """
-        # Validate permission type
-        if role not in ["ADMIN", "STAFF", "VIEWER"]:
-            raise ValueError("Invalid permission type")
-
-        tenant_membership = HospitalMembership.objects.create(
-            user=user,
-            tenant=tenant,
-            hospital_profile=hospital_profile,
-            role=role
-        )
-
-        return tenant_membership
-
-    @staticmethod
-    @transaction.atomic
-    def remove_user_from_tenant(user, tenant):
-        """
-        Remove a user's access to a tenant.
-
-        Args:
-            user: The user to remove
-            tenant: The tenant to remove the user from
-
-        """
-        # Delete permission
-        HospitalMembership.objects.filter(
-            user=user,
-            tenant=tenant
-        ).delete()
-
-
-    @staticmethod
-    def get_tenant_users(tenant, role=None):
-        """
-        Get all users with access to a tenant, optionally filtered by permission type.
-
-        Args:
-            tenant: The tenant to get users for
-            role: Optional permission type to filter by
-
-        """
-        query = HospitalMembership.objects.filter(tenant_id=tenant.id)
-        if role:
-            query = query.filter(role=role)
-        return query.select_related("user")

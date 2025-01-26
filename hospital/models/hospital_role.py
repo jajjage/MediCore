@@ -22,7 +22,7 @@ class Role(models.Model):
         ]
 
     def __str__(self):
-        return self.name
+        return self.code
 
     def get_staff_count(self, tenant):
         """Get count of staff with this role."""

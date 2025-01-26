@@ -1,4 +1,3 @@
-from .address import PatientAddress
 from .appointments import PatientAppointment
 from .contact import PatientEmergencyContact
 from .core import Patient
@@ -12,7 +11,6 @@ from .visits import PatientVisit
 
 __all__ = [
     "Patient",
-    "PatientAddress",
     "PatientAllergies",
     "PatientAppointment",
     "PatientChronicCondition",

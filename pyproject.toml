@@ -131,7 +131,8 @@ ignore = [
     "B904",     # 
     "DTZ007",   # Date time zone
     "N806",     # Variable in function should be lowercase
-    "ARG001",   #
+    "ARG001",   # Argument should be lowercase
+    "F401",     # Use of `assert` detected
 ]
 
 [tool.ruff.lint.per-file-ignores]

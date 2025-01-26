@@ -15,11 +15,18 @@ class HospitalProfile(models.Model):
         "tenants.Client",
         on_delete=models.CASCADE,
         related_name="hospital_profile")
-    staff = models.ManyToManyField(
+
+    members = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         through="hospital.HospitalMembership",
         related_name="associated_hospitals",
         blank=True
+    )
+
+    hospital_code = models.CharField(
+        max_length=4,
+        unique=True,
+        help_text="Unique 3-letter hospital code for PIN generation"
     )
 
     SUBSCRIPTION_CHOICES = [
@@ -113,7 +120,7 @@ class HospitalProfile(models.Model):
 
         This includes the admin user and additional staff
         """
-        cache_key = f"hospital_{self.id}_staff"
+        cache_key = f"hospital_{self.id}_members"
         staff = cache.get(cache_key)
         if not staff:
             staff_memberships = self.hospital_memberships.select_related("user").all()

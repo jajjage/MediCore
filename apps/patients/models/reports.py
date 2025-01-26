@@ -1,15 +1,13 @@
 
 from django.db import models
 
-from .core import Basemodel
+from .core import PatientBasemodel
 
 
-class PatientMedicalReport(Basemodel):
+class PatientMedicalReport(PatientBasemodel):
+    patient = models.ForeignKey("Patient", on_delete=models.CASCADE, related_name="medical_reports")
     title = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
 
     class Meta:
         db_table = "patient_medical_reports"

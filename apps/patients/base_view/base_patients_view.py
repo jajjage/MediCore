@@ -18,14 +18,14 @@ class BaseResponseMixin:
 
     def success_response(self, data: Any = None, message: str = "Success", status_code: int = status.HTTP_200_OK) -> Response:
         response_data = {
-            "status": "success",
+            "status": status_code,
             "message": message,
             "data": data
         }
         return Response(response_data, status=status_code)
     def error_response(self, message: str, code: str | None = None, status_code: int = status.HTTP_400_BAD_REQUEST) -> Response:
         response_data = {
-            "status": "error",
+            "status": status_code,
             "message": message
         }
         if code:

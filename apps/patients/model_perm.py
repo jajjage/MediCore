@@ -21,12 +21,11 @@ def check_model_permissions(serializer, data, is_update):
         "patientdemographics": {"field": "demographics"},
         "patientemergencycontact": {"field": "emergency_contact"},
         "patientallergies": {"field": "allergies"},
-        "patientchronicconditions": {"field": "chronic_conditions"},
-        "patientaddress": {"field": "addresses"},
+        "patientchroniccondition": {"field": "chronic_conditions"},
         "patientoperation": {"field": "patient_operation"},
         "patientmedicalreport": {"field": "medical_reports"},
         "patientvisit": {"field": "patient_visit"},
-        "patientdiagnosis": {"field": "patient_diagnosis"},
+        "patientdiagnoses": {"field": "patient_diagnosis"},
         "patientappointment": {"field": "patient_appointment"},
     }
 

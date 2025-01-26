@@ -4,10 +4,10 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from .core import Basemodel
+from .core import PatientBasemodel
 
 
-class PatientAppointment(Basemodel):
+class PatientAppointment(PatientBasemodel):
     STATUS_CHOICES = [
         ("pending", "Pending"),
         ("approved", "Approved"),
@@ -15,7 +15,11 @@ class PatientAppointment(Basemodel):
         ("completed", "Completed"),
         ("cancelled", "Cancelled"),
     ]
-
+    patient = models.ForeignKey(
+        "patients.Patient",
+        on_delete=models.PROTECT,
+        related_name="appointments"
+    )
     physician = models.ForeignKey(
        "staff.DoctorProfile",
         on_delete=models.PROTECT,

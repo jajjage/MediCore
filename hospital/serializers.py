@@ -15,8 +15,8 @@ class HospitalProfileSerializer(serializers.ModelSerializer):
         fields = [
             "tenant",
             "admin_user",
-            "staff",
             "hospital_name",
+            "hospital_code",
             "license_number",
             "contact_email",
             "contact_phone",
@@ -42,6 +42,7 @@ class CreateTenantRequestSerializer(serializers.Serializer):
 
     # Hospital profile data
     hospital_name = serializers.CharField(max_length=200)
+    hospital_code = serializers.CharField(max_length=4)
     license_number = serializers.CharField(max_length=100)
     contact_email = serializers.EmailField()
     contact_phone = serializers.CharField(max_length=20)

@@ -1,10 +1,11 @@
 
 from django.db import models
 
-from .core import Basemodel
+from .core import PatientBasemodel
 
 
-class PatientPrescription(Basemodel):
+class PatientPrescription(PatientBasemodel):
+    patient = models.ForeignKey("Patient", on_delete=models.CASCADE, related_name="prescriptions")
     issued_by = models.ForeignKey(
         "staff.DoctorProfile",
         on_delete=models.CASCADE,

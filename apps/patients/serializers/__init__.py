@@ -14,10 +14,10 @@ from .medical_serializer import (
 from .operation_serializer import PatientOperationSerializer
 from .patients import (
     CompletePatientSerializer,
-    PatientAddressSerializer,
     PatientDemographicsSerializer,
     PatientEmergencyContactSerializer,
     PatientSearchSerializer,
+    UserSerializer,
 )
 from .prescription_serializer import PatientPrescriptionSerializer
 from .report_serializer import PatientMedicalReportSerializer
@@ -27,7 +27,6 @@ __all__ = [
     "AppointmentStatusUpdateSerializer",
     "AvailabilityCheckSerializer",
     "CompletePatientSerializer",
-    "PatientAddressSerializer",
     "PatientAllergySerializer",
     "PatientAppointmentCreateSerializer",
     "PatientAppointmentSerializer",
@@ -41,5 +40,6 @@ __all__ = [
     "PatientSearchSerializer",
     "PatientVisitSerializer",
     "RecurringAppointmentSerializer",
-    "TimeSlotSerializer"
+    "TimeSlotSerializer",
+    "UserSerializer"
 ]

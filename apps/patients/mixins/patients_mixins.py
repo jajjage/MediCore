@@ -4,7 +4,6 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.patients.models import (
-    PatientAddress,
     PatientAllergies,
     PatientAppointment,
     PatientChronicCondition,
@@ -91,7 +90,6 @@ class PatientRelatedOperationsMixin:
         related_lists = {
             "allergies": PatientAllergies,
             "chronic_conditions": PatientChronicCondition,
-            "addresses": PatientAddress,
         }
 
         for field, model in related_lists.items():
@@ -139,11 +137,6 @@ class PatientCreateMixin:
                     patient=patient, **condition_data
                 )
 
-    def _create_addresses(self, patient, addresses_data):
-        if self.check_permission("add", "patientaddress"):
-            for address_data in addresses_data:
-                PatientAddress.objects.create(patient=patient, **address_data)
-
     def _create_demogrphics(self, patient, demographics):
         if self.check_permission("add", "patientdemographics"):
             for demographics_data in demographics:
@@ -178,14 +171,6 @@ class PatientUpdateMixin:
                 PatientChronicCondition.objects.create(
                     patient=instance, **condition_data
                 )
-
-    def _update_addresses(self, instance, addresses_data):
-        if addresses_data is not None and self.check_permission(
-            "change", "patientaddress"
-        ):
-            instance.addresses.all().delete()
-            for address_data in addresses_data:
-                PatientAddress.objects.create(patient=instance, **address_data)
 
 
 class AppointmentValidator:

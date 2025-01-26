@@ -1,7 +1,7 @@
 from django.utils.timezone import now
 from rest_framework import serializers
 
-from apps.patients.permissions import PermissionCheckedSerializerMixin
+from base_permission.view_permission import PermissionCheckedSerializerMixin
 
 
 class BasePatientSerializer(

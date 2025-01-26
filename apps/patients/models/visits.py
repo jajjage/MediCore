@@ -1,10 +1,11 @@
 
 from django.db import models
 
-from .core import Basemodel
+from .core import PatientBasemodel
 
 
-class PatientVisit(Basemodel):
+class PatientVisit(PatientBasemodel):
+    patient = models.ForeignKey("Patient", on_delete=models.CASCADE, related_name="visits")
     visit_date = models.DateTimeField(db_index=True)
     physician = models.CharField(max_length=100, blank=True, null=True)
     ward_or_clinic = models.CharField(max_length=100, blank=True, null=True, db_index=True)

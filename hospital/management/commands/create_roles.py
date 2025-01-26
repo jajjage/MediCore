@@ -4,7 +4,6 @@ from django.core.management.base import BaseCommand
 
 from apps.patients.models import (
     Patient,
-    PatientAddress,
     PatientAllergies,
     PatientAppointment,
     PatientChronicCondition,
@@ -49,12 +48,12 @@ class Command(BaseCommand):
                 },
             },
             "TENANT_ADMIN": {
-                "name": "tenant_admin",
+                "name": "Tenant Admin",
                 "description": "Has all permissions in the tenant",
                 "permissions": {
+                    "myuser": ["view", "add"],
                     "patient": ["view", "add", "change", "delete"],
                     "patientdemographics": ["view", "add", "change", "delete"],
-                    "patientaddress": ["view", "add", "change", "delete"],
                     "patientemergencycontact": ["view", "add", "change", "delete"],
                     "patientallergies": ["view", "add", "change", "delete"],
                     "patientchroniccondition": ["view", "add", "change", "delete"],
@@ -80,7 +79,6 @@ class Command(BaseCommand):
                 "description": "Medical Doctor with patient care responsibilities",
                 "permissions": {
                     "patient": ["view", "add", "change"],
-                    "patientaddress": ["view"],
                     "patientallergies": ["view", "add", "change"],
                     "patientappointment": ["view", "add", "change"],
                     "patientchroniccondition": ["view", "add", "change"],
@@ -98,11 +96,10 @@ class Command(BaseCommand):
                 "description": "Senior medical doctor with additional permissions",
                 "permissions": {
                     "patient": ["view", "add", "change", "delete"],
-                    "patientaddress": ["view", "add", "change", "delete"],
                     "patientallergies": ["view", "add", "change", "delete"],
                     "patientappointment": ["view", "add", "change", "delete"],
                     "patientchroniccondition": ["view", "add", "change", "delete"],
-                    "patientdemographics": ["view", "add", "change", "delete"],
+                    "patientdemographics": ["view"],
                     "patientdiagnoses": ["view", "add", "change", "delete"],
                     "patientemergencycontact": ["view", "add", "change", "delete"],
                     "patientmedicalreport": ["view", "add", "change", "delete"],
@@ -116,7 +113,6 @@ class Command(BaseCommand):
                 "description": "Nursing staff providing patient support",
                 "permissions": {
                     "patient": ["view"],
-                    "patientaddress": ["view"],
                     "patientallergies": ["view", "add"],
                     "patientappointment": ["view", "add"],
                     "patientchroniccondition": ["view"],
@@ -134,7 +130,6 @@ class Command(BaseCommand):
                 "description": "Handles laboratory tests and procedures",
                 "permissions": {
                     "patient": ["view"],
-                    "patientaddress": ["view"],
                     "patientallergies": ["view"],
                     "patientappointment": ["view"],
                     "patientchroniccondition": ["view"],
@@ -152,7 +147,6 @@ class Command(BaseCommand):
                 "permissions": {
                     "patient": ["view"],
                     "patientdemographics": ["view"],
-                    "patientaddress": ["view"],
                     "patientemergencycontact": ["view"],
                     "patientallergies": ["view"],
                     "patientchroniccondition": ["view"],
@@ -170,7 +164,6 @@ class Command(BaseCommand):
         model_content_types = {
             "patient": ContentType.objects.get_for_model(Patient),
             "patientdemographics": ContentType.objects.get_for_model(PatientDemographics),
-            "patientaddress": ContentType.objects.get_for_model(PatientAddress),
             "patientemergencycontact": ContentType.objects.get_for_model(PatientEmergencyContact),
             "patientallergies": ContentType.objects.get_for_model(PatientAllergies),
             "patientchroniccondition": ContentType.objects.get_for_model(PatientChronicCondition),
