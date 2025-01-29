@@ -1,7 +1,6 @@
 
 from rest_framework.exceptions import ValidationError
 
-from apps.patients.base_view.base_patients_view import BasePatientViewSet
 from apps.patients.models import (
     PatientAppointment,
     PatientPrescription,
@@ -9,9 +8,10 @@ from apps.patients.models import (
 from apps.patients.serializers import (
     PatientPrescriptionSerializer,
 )
+from base_view import BaseViewSet
 
 
-class PatientPrescriptionViewSet(BasePatientViewSet):
+class PatientPrescriptionViewSet(BaseViewSet):
     """
     A viewset for managing Prescription instances with optimized querying.
 

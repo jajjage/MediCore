@@ -9,10 +9,6 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.views import APIView
 
-from apps.patients.base_view.base_patients_view import (
-    BasePatientViewSet,
-    BaseResponseMixin,
-)
 from apps.patients.models import (
     Patient,
     PatientDemographics,
@@ -28,18 +24,19 @@ from apps.patients.serializers import (
     PatientSearchSerializer,
     UserSerializer,
 )
+from base_permission.user_create_perm import UserCreatePermission
+from base_view import (
+    BaseResponseMixin,
+    BaseViewSet,
+)
 from hospital.models import HospitalProfile
 from hospital.models.hospital_role import Role
 
 logger = logging.getLogger(__name__)
-class PatientViewSet(BasePatientViewSet):
+class PatientViewSet(BaseViewSet):
     """ViewSet for Patient model with role-based permissions."""
 
     serializer_class = CompletePatientSerializer
-    print(PatientVisit._meta.get_field("patient").remote_field.related_name)
-        # For models inheriting BaseModel
-    print(PatientAllergies._meta.get_field("patient").remote_field.related_name)  # "allergies"
-
     def get_queryset(self):
        return Patient.objects.select_related(
             "user"
@@ -114,7 +111,7 @@ class PatientViewSet(BasePatientViewSet):
         return self.success_response(data=serializer.data, message="Search results retrieved successfully")
 
 
-class PatientDemographicsViewSet(BasePatientViewSet):
+class PatientDemographicsViewSet(BaseViewSet):
     """ViewSet for PatientDemographics model with role-based permissions."""
 
     serializer_class = PatientDemographicsSerializer
@@ -135,6 +132,7 @@ class PatientDemographicsViewSet(BasePatientViewSet):
 
 
 class UserCreateView(APIView, BaseResponseMixin):
+    permission_classes = [UserCreatePermission]
     basename = "my-user"
 
     def post(self, request):
@@ -152,17 +150,22 @@ class UserCreateView(APIView, BaseResponseMixin):
 
             # Initialize response data with serializer data
             response_data = serializer.data
+            role_ = role.name.lower()
+            profile_attr = f"{role_}_profile"
+            print(profile_attr)
 
         # Only add patient ID if role is Patient
-            if role.name.lower() == "patient":
+            if role.name.lower() in ["patient", "doctor", "nurse", "lab technician"]:
                 try:
                     # Access the patient through the reverse relation
                     # Assumes Patient model has OneToOneField to User
-                    response_data["patient_id"] = user.patient_profile.id
+                    profile = getattr(user, profile_attr, None)
+                    print(profile)
+                    response_data["profile_id"] = profile.id
                 except AttributeError:
                     # Handle case where patient profile wasn't created
-                    logger.exception(f"Patient profile missing for user {user.id}")
-                    response_data["warning"] = "Patient profile not initialized"
+                    logger.exception(f"profile missing for user {user.id}")
+                    response_data["warning"] = "profile not initialized"
 
             return self.success_response(data=response_data, status_code=201)
         return self.error_response(message=serializer.errors, status_code=400)

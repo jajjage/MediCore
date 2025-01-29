@@ -4,7 +4,6 @@ from rest_framework.permissions import BasePermission
 
 from apps.staff.helper import (
     convert_queryset_to_role_permissions,
-    normalize_permissions_dict,
 )
 from hospital.models import Role
 
@@ -133,7 +132,8 @@ ROLE_PERMISSIONS = {
             }
         }
 
-class RolePermission(BasePermission):
+
+class UserCreatePermission(BasePermission):
     """
     Custom permission to check user roles and their permissions.
     """
@@ -151,45 +151,17 @@ class RolePermission(BasePermission):
             user_role = str(user_role).strip()
 
             if user_role not in ROLE_PERMISSIONS:
-                print(f"User role not found: {user_role}")
                 return False
-            act = hasattr(view, "basename")
-            if not hasattr(view, "basename") or not hasattr(view, "action"):
-                print(f"View does not have basename or action: {act}")
+
+            if not hasattr(view, "basename"):
                 return False
 
             resource = view.basename
             resource_ = resource.replace("-", " ")
             normalized_resource = "".join(word for word in resource_.split())
-            action = view.action
-            print(f"Action received: {action}")
-            print(f"res {normalized_resource}")
 
-
-            # Map DRF actions to permissions
-            action_to_permission = {
-                "list": "view",
-                "retrieve": "view",
-                "create": "add",
-                "update": "change",
-                "partial_update": "change",
-                "destroy": "delete",
-                "search": "view",
-                "update_emergency_contact": "add",
-                # Add any custom actions here
-                "cancel": "change",
-                "reschedule": "change",
-                "update_status": "change",
-                "available_slots": "view",
-                "check_availability": "add",
-                "create_recurring": "add"
-            }
-            permission = action_to_permission.get(action)
-            print(f"Resolved permission for action '{action}': {permission}")
-
-            if not permission:
-                return False
-            cache_key = f"user_role_permissions_{user_role}"
+            permission = "add"
+            cache_key = f"user_role_permissions_create{user_role}"
             # Check cache first
             permissions = cache.get(cache_key)
             try:
@@ -204,7 +176,6 @@ class RolePermission(BasePermission):
                 permissions_dict = convert_queryset_to_role_permissions(
                     permissions_queryset
                 )
-                print(f"Permissions dict: {permissions_dict}")
                 # Cache the permissions for 1 hour
                 cache.set(cache_key, permissions_dict, timeout=3600)
                 permissions = permissions_dict
@@ -218,51 +189,6 @@ class RolePermission(BasePermission):
                 model_permissions = allowed_permissions.get(normalized_resource, [])
 
             return permission in model_permissions
-        except AttributeError:
-            raise PermissionDenied("User does not have a valid hospital membership role.")
-        except (ValueError, Role.DoesNotExist) as e:
-            raise PermissionDenied(f"Error: {e}")
-
-
-class PermissionCheckedSerializerMixin:
-    def check_permission(self, permission_type: str, model_name: str) -> bool:
-        request = self.context.get("request")
-        if not request or not request.user:
-            return False
-        try:
-            user_role = request.user.hospital_memberships_user.first().role
-            normalize_role = str(user_role).strip().upper().replace(" ", "_")
-
-
-            cache_key = f"user_role_permissions_{user_role}"
-            permissions = cache.get(cache_key)
-
-            try:
-                role = Role.objects.get(code=normalize_role)
-                print(f"Found role: {role}")
-            except Role.DoesNotExist as err:
-                print(f"Role not found: {normalize_role}")
-                raise ValueError(
-                    f"No StaffRole found with code: normalize_role: {normalize_role}"
-                ) from err
-
-            if permissions is None:
-                permissions_queryset = role.permissions.all()
-                permissions_dict = convert_queryset_to_role_permissions(
-                    permissions_queryset
-                )
-                cache.set(cache_key, permissions_dict, timeout=36)
-                permissions = permissions_dict
-
-            if hasattr(request.user, "user_permissions"):
-                model_permissions = permissions.get(model_name, [])
-            else:
-                user_permissions = ROLE_PERMISSIONS.get(normalize_role, {})
-                permissions_dict = normalize_permissions_dict(user_permissions)
-                model_permissions = permissions_dict.get(model_name, [])
-
-            result = permission_type in model_permissions
-            return result
         except AttributeError:
             raise PermissionDenied("User does not have a valid hospital membership role.")
         except (ValueError, Role.DoesNotExist) as e:

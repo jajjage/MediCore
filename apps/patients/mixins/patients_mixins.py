@@ -13,7 +13,7 @@ from apps.patients.models import (
 )
 
 
-class PatientCalculationMixin:
+class CalculationMixin:
     """Mixin for common patient calculations."""
 
     def calculate_bmi(self, height_cm, weight_kg):

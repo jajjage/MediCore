@@ -1,5 +1,6 @@
 # models/staff_profiles.py
 
+from django.conf import settings
 from django.db import models
 
 from .core import StaffProfile
@@ -8,9 +9,15 @@ from .core import StaffProfile
 class DoctorProfile(StaffProfile):
     """Profile specific to doctors."""
 
-    specialization = models.CharField(max_length=100)
-    license_number = models.CharField(max_length=50, unique=True)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="doctor_profile",
+    )
+    specialization = models.CharField(max_length=100, null=True, blank=True)
+    license_number = models.CharField(max_length=50, unique=True, null=True, blank=True)
     availability = models.JSONField(
+        null=True,
         default=dict,
         help_text="Weekly schedule in JSON format"
     )
@@ -28,15 +35,25 @@ class DoctorProfile(StaffProfile):
 class NurseProfile(StaffProfile):
     """Profile specific to nurses."""
 
-    nurse_license = models.CharField(max_length=50, unique=True)
-    ward_specialty = models.CharField(max_length=100)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="nurse_profile",
+    )
+    nurse_license = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    ward_specialty = models.CharField(max_length=100, null=True, blank=True)
     class Meta:
         db_table = "nurse_profile"
 
 class TechnicianProfile(StaffProfile):
     """Profile specific to technicians."""
 
-    technician_license = models.CharField(max_length=50, unique=True)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="technician_profile",
+    )
+    technician_license = models.CharField(max_length=50, unique=True, null=True, blank=True)
     equipment_specialties = models.JSONField(
         default=list,
         help_text="List of equipment specialties"

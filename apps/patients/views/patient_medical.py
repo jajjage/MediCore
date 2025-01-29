@@ -1,4 +1,3 @@
-from apps.patients.base_view.base_patients_view import BasePatientViewSet
 from apps.patients.models import (
     PatientAllergies,
     PatientChronicCondition,
@@ -7,9 +6,10 @@ from apps.patients.serializers import (
     PatientAllergySerializer,
     PatientChronicConditionSerializer,
 )
+from base_view import BaseViewSet
 
 
-class PatientAllergyViewSet(BasePatientViewSet):
+class PatientAllergyViewSet(BaseViewSet):
     """ViewSet for PatientAllergy model with role-based permissions."""
 
     serializer_class = PatientAllergySerializer
@@ -22,7 +22,7 @@ class PatientAllergyViewSet(BasePatientViewSet):
         serializer.save(patient_id=self.kwargs.get("patient__pk"))
 
 
-class PatientChronicConditionViewSet(BasePatientViewSet):
+class PatientChronicConditionViewSet(BaseViewSet):
     """ViewSet for PatientChronicCondition model with role-based permissions."""
 
     serializer_class = PatientChronicConditionSerializer

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.patients.mixins.patients_mixins import (
-    PatientCalculationMixin,
+    CalculationMixin,
 )
 from apps.patients.model_perm import prescription_period
 from apps.patients.models import (
@@ -11,7 +11,7 @@ from apps.patients.models import (
 from .base_serializer import BasePatientSerializer
 
 
-class PatientPrescriptionSerializer(BasePatientSerializer, PatientCalculationMixin):
+class PatientPrescriptionSerializer(BasePatientSerializer, CalculationMixin):
     physician_full_name = serializers.SerializerMethodField()
     class Meta:
         model = PatientPrescription

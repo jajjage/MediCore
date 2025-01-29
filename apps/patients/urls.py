@@ -72,7 +72,7 @@ prescription_router.register(
 
 
 urlpatterns = [
-    path("register/", UserCreateView.as_view(), name="register"),
+    path("register/", UserCreateView.as_view(), name = "my-user"),
     path("", include(router.urls)),
     path("", include(demographics_router.urls)),
     path("", include(allergy_router.urls)),

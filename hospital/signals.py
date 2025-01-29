@@ -8,6 +8,7 @@ from django.dispatch import receiver
 from django_tenants.utils import schema_context
 
 from apps.patients.models.core import Patient
+from apps.staff.models import DoctorProfile
 from hospital.models import HospitalMembership
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,19 @@ def create_patient_profile(sender, instance, created, **kwargs):
 
     except (ValidationError, AttributeError, transaction.TransactionManagementError) as unexpected_error:
         logger.critical(f"Specific error in patient profile creation: {unexpected_error}")
+
+@receiver(post_save, sender=HospitalMembership)
+def create_staff_profile(sender, instance, created, **kwargs):
+
+    try:
+        if instance.role.name in ["Doctor", "Nurse", "Lab Technician"]:
+            user = instance.user
+
+            # Atomic transaction to ensure consistency
+            with schema_context(instance.tenant.schema_name), transaction.atomic():
+                DoctorProfile.objects.get_or_create(user=user)
+    except (ValidationError, AttributeError, transaction.TransactionManagementError) as unexpected_error:
+        logger.critical(f"Specific error in staff profile creation: {unexpected_error}")
 
 
 @receiver([post_save, post_delete], sender=HospitalMembership)

@@ -7,7 +7,6 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from apps.patients.base_view.base_patients_view import BasePatientViewSet
 from apps.patients.models import (
     PatientAppointment,
 )
@@ -26,9 +25,10 @@ from apps.patients.services.appointment_service import (
     RecurringAppointmentService,
     SchedulePatternService,
 )
+from base_view import BaseViewSet
 
 
-class PatientAppointmentViewSet(BasePatientViewSet):
+class PatientAppointmentViewSet(BaseViewSet):
     """
     ViewSet for managing patient appointments with comprehensive service integration.
     """

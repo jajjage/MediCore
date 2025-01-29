@@ -3,7 +3,7 @@ from rest_framework import serializers
 
 from apps.patients.mixins.patients_mixins import (
     AppointmentValidator,
-    PatientCalculationMixin,
+    CalculationMixin,
 )
 from apps.patients.models import (
     PatientAppointment,
@@ -13,7 +13,7 @@ from apps.staff.models.department_member import DepartmentMember
 from .base_serializer import BasePatientSerializer
 
 
-class PatientAppointmentCreateSerializer(BasePatientSerializer, PatientCalculationMixin):
+class PatientAppointmentCreateSerializer(BasePatientSerializer, CalculationMixin):
     class Meta:
         model = PatientAppointment
         fields = [
@@ -81,7 +81,7 @@ class PatientAppointmentCreateSerializer(BasePatientSerializer, PatientCalculati
         print(data)
         return data
 
-class PatientAppointmentSerializer(BasePatientSerializer, PatientCalculationMixin):
+class PatientAppointmentSerializer(BasePatientSerializer, CalculationMixin):
     physician_full_name = serializers.SerializerMethodField()
     patient_full_name = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()

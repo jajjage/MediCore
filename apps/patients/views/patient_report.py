@@ -1,16 +1,16 @@
 
 from rest_framework.exceptions import NotFound
 
-from apps.patients.base_view.base_patients_view import BasePatientViewSet
 from apps.patients.models import (
     PatientMedicalReport,
 )
 from apps.patients.serializers import (
     PatientMedicalReportSerializer,
 )
+from base_view import BaseViewSet
 
 
-class PatientMedicalReportViewSet(BasePatientViewSet):
+class PatientMedicalReportViewSet(BaseViewSet):
     serializer_class = PatientMedicalReportSerializer
 
     basename = "patientmedicalreport"

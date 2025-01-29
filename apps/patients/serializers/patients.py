@@ -6,7 +6,7 @@ from django_tenants.utils import schema_context
 from rest_framework import serializers
 
 from apps.patients.mixins.patients_mixins import (
-    PatientCalculationMixin,
+    CalculationMixin,
     PatientCreateMixin,
     PatientRelatedOperationsMixin,
     PatientUpdateMixin,
@@ -77,7 +77,7 @@ class UserSerializer(serializers.ModelSerializer):
                 is_tenant_admin=is_tenant_admin)
 
         return user
-class PatientDemographicsSerializer(BasePatientSerializer, PatientCalculationMixin):
+class PatientDemographicsSerializer(BasePatientSerializer, CalculationMixin):
     """Serializer for patient demographics."""
 
     bmi = serializers.SerializerMethodField()
@@ -148,7 +148,7 @@ class PatientEmergencyContactSerializer(BasePatientSerializer):
 
 class CompletePatientSerializer(
     BasePatientSerializer,
-    PatientCalculationMixin,
+    CalculationMixin,
     PatientCreateMixin,
     PatientUpdateMixin,
     PatientRelatedOperationsMixin,
@@ -319,7 +319,7 @@ class CompletePatientSerializer(
 
         return representation
 
-class PatientSearchSerializer(BasePatientSerializer, PatientCalculationMixin):
+class PatientSearchSerializer(BasePatientSerializer, CalculationMixin):
     """Lightweight serializer for patient search results."""
 
     full_name = serializers.SerializerMethodField()

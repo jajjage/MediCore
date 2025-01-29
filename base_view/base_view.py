@@ -45,7 +45,7 @@ class PatientRelatedMixin:
         if not Patient.objects.filter(pk=patient_id).exists():
             raise NotFound("Patient not found")
 
-class BasePatientViewSet(ModelViewSet, BaseResponseMixin, PatientRelatedMixin):
+class BaseViewSet(ModelViewSet, BaseResponseMixin, PatientRelatedMixin):
     """Base ViewSet for patient-related models with standardized CRUD operations."""
 
     permission_classes = [RolePermission]

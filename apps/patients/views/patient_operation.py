@@ -3,7 +3,6 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.patients.base_view.base_patients_view import BasePatientViewSet
 from apps.patients.models import (
     PatientOperation,
 )
@@ -11,9 +10,10 @@ from apps.patients.serializers import (
     PatientOperationSerializer,
 )
 from apps.patients.services.operation_service import OperationService
+from base_view import BaseViewSet
 
 
-class PatientOperationViewSet(BasePatientViewSet):
+class PatientOperationViewSet(BaseViewSet):
     """
     ViewSet for managing patient operations.
     """

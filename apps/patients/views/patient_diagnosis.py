@@ -1,15 +1,15 @@
 
 
-from apps.patients.base_view.base_patients_view import BasePatientViewSet
 from apps.patients.models import (
     PatientDiagnoses,
 )
 from apps.patients.serializers import (
     PatientDiagnosisSerializer,
 )
+from base_view import BaseViewSet
 
 
-class PatientDiagnosisViewSet(BasePatientViewSet):
+class PatientDiagnosisViewSet(BaseViewSet):
     """
     ViewSet for managing patient diagnoses.
     """

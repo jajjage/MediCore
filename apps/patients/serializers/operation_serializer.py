@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.patients.mixins.patients_mixins import (
-    PatientCalculationMixin,
+    CalculationMixin,
 )
 from apps.patients.models import (
     PatientOperation,
@@ -10,7 +10,7 @@ from apps.patients.models import (
 from .base_serializer import BasePatientSerializer
 
 
-class PatientOperationSerializer(BasePatientSerializer, PatientCalculationMixin):
+class PatientOperationSerializer(BasePatientSerializer, CalculationMixin):
     """
     Serializer for patient operations with validation and history tracking.
     """
