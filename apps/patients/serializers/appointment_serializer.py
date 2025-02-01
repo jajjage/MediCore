@@ -9,16 +9,19 @@ from apps.patients.models import (
     PatientAppointment,
 )
 from apps.staff.models.department_member import DepartmentMember
+from hospital.models.hospital_members import HospitalMembership
 
 from .base_serializer import BasePatientSerializer
 
 
 class PatientAppointmentCreateSerializer(BasePatientSerializer, CalculationMixin):
+    user = serializers.UUIDField(write_only=True)  # For accepting UUID in request
+    department = serializers.UUIDField(write_only=True)
     class Meta:
         model = PatientAppointment
         fields = [
             "id",
-            "physician",
+            "user",
             "department",
             "appointment_date",
             "appointment_time",
@@ -42,13 +45,33 @@ class PatientAppointmentCreateSerializer(BasePatientSerializer, CalculationMixin
 
     def validate(self, data):
         # Validate recurring appointment settings
-        department = data.get("department")
-        physician = data.get("physician")
+        department_uuid = data.get("department")
+        user_uuid = data.get("user")
+        request = self.context.get("request")
 
-        if department and physician and not DepartmentMember.objects.filter(
-            department=department,
-            user=physician,
-            user__role__name="Doctor"
+        if not request or not hasattr(request, "tenant") or not hasattr(request.tenant, "hospital_profile"):
+            raise serializers.ValidationError("Invalid tenant configuration")
+
+        current_hospital = request.tenant.hospital_profile
+
+        # Validate and get user
+        try:
+            # Find user through their hospital membership
+            membership = HospitalMembership.objects.get(
+                user__id=user_uuid,
+                hospital_profile=current_hospital,
+                is_active=True,
+            )
+            physician = membership.user
+        except HospitalMembership.DoesNotExist:
+            raise serializers.ValidationError(
+                f"User with ID {user_uuid} does not have an active membership in this hospital"
+            )
+
+        if department_uuid and physician and not DepartmentMember.objects.filter(
+            department_id=department_uuid,
+            user_id=user_uuid,
+            role="DOCTOR"
         ).exists():
                 raise serializers.ValidationError({
                     "physician": "Selected physician does not belong to the specified department."
@@ -78,7 +101,6 @@ class PatientAppointmentCreateSerializer(BasePatientSerializer, CalculationMixin
             physician,
             self.instance
         )
-        print(data)
         return data
 
 class PatientAppointmentSerializer(BasePatientSerializer, CalculationMixin):

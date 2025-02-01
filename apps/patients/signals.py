@@ -1,12 +1,12 @@
 from django.db import connection
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django_tenants.models import TenantMixin
 from django_tenants.utils import schema_context
 
 
 @receiver(post_save, sender=TenantMixin)
-def create_tenant_pin_sequence(sender, instance, created, **kwargs):  # noqa: ARG001
+def create_tenant_pin_sequence(sender, instance, created, **kwargs):
     """Create PIN sequence when new tenant is created."""
     if created:
         with schema_context(instance.schema_name), connection.cursor() as cursor:
@@ -28,3 +28,5 @@ def create_tenant_pin_sequence(sender, instance, created, **kwargs):  # noqa: AR
                     CYCLE;
                 """)
         cursor.execute("CREATE INDEX patient_pin_lower_idx ON patients (LOWER(pin));")
+
+

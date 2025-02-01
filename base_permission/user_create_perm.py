@@ -190,6 +190,6 @@ class UserCreatePermission(BasePermission):
 
             return permission in model_permissions
         except AttributeError:
-            raise PermissionDenied("User does not have a valid hospital membership role.")
+            raise PermissionDenied("Ananymous User does not have a valid hospital membership role.")
         except (ValueError, Role.DoesNotExist) as e:
             raise PermissionDenied(f"Error: {e}")

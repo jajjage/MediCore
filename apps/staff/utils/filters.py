@@ -12,12 +12,11 @@ from apps.staff.models import (
 
 
 class WorkloadAssignmentFilter(filters.FilterSet):
-    date_range = filters.DateFromToRangeFilter(field_name="week_start_date")
     department_member = filters.ModelChoiceFilter(queryset=DepartmentMember.objects.all())
 
     class Meta:
         model = WorkloadAssignment
-        fields = ["department_member", "week_start_date"]
+        fields = ["department_member"]
 
 class StaffTransferFilter(filters.FilterSet):
     transfer_type = filters.TypedChoiceFilter(choices=[

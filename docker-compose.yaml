@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   app:
     build:
@@ -8,17 +10,23 @@ services:
     volumes:
       - ..:/workspace:cached
     command: sleep infinity
-    network_mode: service:db
     environment:
-      - POSTGRES_HOST=localhost
+      - POSTGRES_HOST=db
       - POSTGRES_DB=medicore_db
       - POSTGRES_USER=medicore_user
       - POSTGRES_PASSWORD=medicore_password
-      - REDIS_HOST=localhost
+      - REDIS_HOST=redis
       - DJANGO_SETTINGS_MODULE=medicore.settings
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY} # Added for encryption
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - DEBUG=1
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+    networks:
+      - medicore-network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   db:
     image: postgres:15
@@ -29,14 +37,80 @@ services:
       - POSTGRES_DB=medicore_db
       - POSTGRES_USER=medicore_user
       - POSTGRES_PASSWORD=medicore_password
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    networks:
+      - medicore-network
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medicore_user -d medicore_db"] # More accurate check
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7
     restart: unless-stopped
-    network_mode: service:db
     volumes:
       - redis-data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - medicore-network
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 3
+
+  celery:
+    build: .
+    command: poetry run celery -A medicore worker --loglevel=info
+    volumes:
+      - .:/code
+    working_dir: /code
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=medicore_db
+      - POSTGRES_USER=medicore_user
+      - POSTGRES_PASSWORD=medicore_password
+      - REDIS_HOST=redis
+      - DJANGO_SETTINGS_MODULE=medicore.settings
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - DEBUG=1
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+    networks:
+      - medicore-network
+    depends_on:
+      - db
+      - redis
+
+  celery-beat:
+    build: .
+    command: poetry run celery -A medicore beat --loglevel=info
+    volumes:
+      - .:/code
+    working_dir: /code
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=medicore_db
+      - POSTGRES_USER=medicore_user
+      - POSTGRES_PASSWORD=medicore_password
+      - REDIS_HOST=redis
+      - DJANGO_SETTINGS_MODULE=medicore.settings
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - DEBUG=1
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+    networks:
+      - medicore-network
+    depends_on:
+      - db
+      - redis
 
 volumes:
   postgres-data:
   redis-data:
+
+networks:
+  medicore-network:
+    driver: bridge

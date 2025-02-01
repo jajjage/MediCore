@@ -2,6 +2,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 env = environ.Env()
 
@@ -43,7 +44,7 @@ DEFAULT_APPS = [
 TENANT_APPS = [
     "apps.patients",  # Example tenant-specific app
     "apps.staff",
-    # "apps.doctors",
+    "apps.scheduling",
     # "apps.nurses",
     # "apps.receptionists",
 ]
@@ -106,7 +107,7 @@ DATABASES = {
         "NAME": env("POSTGRES_DB", default="medicore_db"),
         "USER": env("POSTGRES_USER", default="medicore_user"),
         "PASSWORD": env("POSTGRES_PASSWORD", default="medicore_password"),
-        "HOST": env("POSTGRES_HOST", default="localhost"),
+        "HOST": env("POSTGRES_HOST", default="db"),
         "PORT": env("POSTGRES_PORT", default="5432"),
     }
 }
@@ -119,7 +120,7 @@ DATABASE_ROUTERS = ("django_tenants.routers.TenantSyncRouter",)
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379/1",  # Redis URL
+        "LOCATION": "redis://redis:6379/0",  # Redis URL
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
@@ -232,10 +233,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = "static/"
-STATIC_ROOT = str(BASE_DIR / "staticfiles")
-STATICFILES_DIRS = [
-    str(BASE_DIR / "static"),
-]
+# STATIC_ROOT = str(BASE_DIR / "staticfiles")
+# STATICFILES_DIRS = [
+#     str(BASE_DIR / "static"),
+# ]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -301,3 +302,19 @@ CORS_ALLOW_HEADERS = [
 CORS_EXPOSE_HEADERS = [
     "Set-Cookie",
 ]
+
+# settings.py
+# settings.py
+CELERY_BROKER_URL = "redis://redis:6379/1"  # ← Change from localhost to redis
+CELERY_RESULT_BACKEND = "redis://redis:6379/1"
+CELERY_TIMEZONE = "UTC"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+
+
+CELERY_BEAT_SCHEDULE = {
+    "generate-shifts-every-day": {
+        "task": "apps.scheduling.tasks.generate_shifts",
+        "schedule": crontab(hour=2, minute=30),  # 2:30 AM daily
+    },
+}

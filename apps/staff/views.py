@@ -199,35 +199,16 @@ class DepartmentMemberViewSet(BaseViewSet):
     serializer_class = DepartmentMemberSerializer
     queryset = DepartmentMember.objects.select_related("department", "user")
 
-
     def perform_create(self, serializer):
-        # Validate related objects exist (reads outside the transaction)
-        try:
-            Department.objects.get(id=self.request.data.get("department"))
-        except Department.DoesNotExist as e:
-            return self.handle_exception(e)
+        from apps.scheduling.tasks import generate_initial_shifts
+        generate_initial_shifts.delay(serializer.instance.id)
 
-        try:
-            MyUser.objects.get(id=self.request.data.get("user"))
-        except MyUser.DoesNotExist as e:
-            return self.handle_exception(e)
-
-        # Validate serializer data
-        serializer = self.get_serializer(data=self.request.data)
-        if not serializer.is_valid():
-            return Response(
-                serializer.errors,
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Atomic transaction for the critical write operation
-        try:
-            with transaction.atomic():
-                serializer.save()
-        except Exception as e:
-            logger.exception("Error during %s creation: %s", self.basename, str(e))
-            return self.handle_exception(e)
-
+        headers = self.get_success_headers(serializer.data)
+        return self.success_response(
+            data=serializer.data,
+            status=status.HTTP_201_CREATED,
+            message=headers
+        )
 
     @action(detail=True, methods=["get"])
     def workload_analysis(self, request, pk=None):

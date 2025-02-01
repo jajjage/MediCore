@@ -1,20 +1,41 @@
+from django.conf import settings
 from django.db import models
 
 
 class WorkloadAssignment(models.Model):
-    department_member = models.ForeignKey("DepartmentMember", on_delete=models.PROTECT)
-    week_start_date = models.DateField()
-    scheduled_hours = models.DecimalField(max_digits=5, decimal_places=2)  # Example: up to 999.99 hours
-    actual_hours = models.DecimalField(max_digits=5, decimal_places=2)
-    on_call_hours = models.DecimalField(max_digits=5, decimal_places=2)
-    notes = models.TextField()
+    generated_shift = models.OneToOneField(
+        "scheduling.GeneratedShift",
+        on_delete=models.PROTECT,
+        related_name="workload"
+    )
+    actual_start = models.DateTimeField(null=True, blank=True)
+    actual_end = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
     break_duration = models.DurationField(null=True, blank=True)
     is_overtime = models.BooleanField(default=False)
-    shift_type = models.CharField(
+    status = models.CharField(
         max_length=20,
         choices=[
-            ("REGULAR", "Regular"),
-            ("ON_CALL", "On Call"),
-            ("EMERGENCY", "Emergency"),
+            ("COMPLETED", "Completed"),
+            ("PARTIAL", "Partially Completed"),
+            ("MISSED", "Missed"),
+            ("OVERTIME", "Extended Beyond Shift")
         ],
+        default="COMPLETED"
     )
+    replacement_staff = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="covered_shifts"
+    )
+
+    class Meta:
+        db_table = "workload_assignments"
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(actual_start__lte=models.F("actual_end")),
+                name="valid_assignment_duration"
+            )
+        ]

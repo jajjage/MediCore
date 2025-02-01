@@ -66,7 +66,7 @@ class BaseViewSet(ModelViewSet, BaseResponseMixin, PatientRelatedMixin):
             )
         except ValidationError as e:
             return self.error_response(
-                message=str(e),
+                message=str(e), #detail.get("non_field_errors")
                 code="validation_error",
                 status_code=status.HTTP_400_BAD_REQUEST
             )

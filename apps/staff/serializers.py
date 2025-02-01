@@ -4,7 +4,10 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.patients.mixins.patients_mixins import CalculationMixin
+from apps.scheduling.models import DepartmentMemberShift, ShiftTemplate
+from apps.scheduling.utils.shift_generator import ShiftGenerator
 from core.models import MyUser
+from hospital.models.hospital_members import HospitalMembership
 
 from .models import (
     Department,
@@ -112,42 +115,91 @@ class StaffTransferSerializer(serializers.ModelSerializer, CalculationMixin):
 class DepartmentMemberSerializer(serializers.ModelSerializer):
     workload = WorkloadAssignmentSerializer(many=True, read_only=True)
     transfers = StaffTransferSerializer(many=True, read_only=True)
-    user = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),  # We'll set this in __init__
-        required=True
+    shifts = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        write_only=True,
+        help_text="List of shift assignments in format: "
+                 "{shift_template: UUID, start_date: YYYY-MM-DD, end_date: YYYY-MM-DD}"
     )
-
+    user = serializers.UUIDField(write_only=True)  # For accepting UUID in request
+    user_details = serializers.SerializerMethodField(read_only=True)  # For returning user details
+    department = serializers.UUIDField(write_only=True)
     class Meta:
         model = DepartmentMember
-        fields = ["id", "department", "user", "role", "start_date", "end_date",
+        fields = ["id", "department", "user", "user_details", "role", "start_date", "end_date",
                  "is_primary", "assignment_type", "time_allocation", "emergency_contact",
-                 "schedule_pattern", "workload", "transfers", "is_active"]
+                 "workload", "transfers", "is_active", "shifts"]
+        read_only_fields = ["id", "workload", "transfers"]
+        extra_kwargs = {
+            "user": {"required": True},
+            "department": {"required": True}
+        }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        request = self.context.get("request")
-        if request and hasattr(request, "tenant") and hasattr(request.tenant, "hospital_profile"):
-            current_hospital = request.tenant.hospital_profile
-            print(current_hospital)
-            # Filter users who have active membership with current hospital
-            valid_users = User.objects.filter(
-                hospital_memberships_user__hospital_profile=current_hospital,
-                hospital_memberships_user__is_active=True,
-            ).distinct()
-            self.fields["user"].queryset = valid_users
+    def get_user_details(self, obj):
+        return {
+            "id": obj.user.id,
+            "full_name": f"{obj.user.first_name} {obj.user.last_name}",
+            "email": obj.user.email
+        }
 
     def validate(self, data):
-        # Validate user has active membership
-        if not self._validate_hospital_membership(data["user"]):
+        """Validate the incoming data and ensure that the user and department are valid."""
+        user_uuid = data.get("user")
+        department_uuid = data.get("department")
+        request = self.context.get("request")
+        generator = ShiftGenerator()
+        projected = generator.calculate_projected_hours(data)
+        if projected > data["department_member"].max_weekly_hours:
+            raise serializers.ValidationError("Exceeds weekly hour limit")
+
+        if not request or not hasattr(request, "tenant") or not hasattr(request.tenant, "hospital_profile"):
+            raise serializers.ValidationError("Invalid tenant configuration")
+
+        current_hospital = request.tenant.hospital_profile
+
+        # Validate and get user
+        try:
+            # Find user through their hospital membership
+            membership = HospitalMembership.objects.get(
+                user__id=user_uuid,
+                hospital_profile=current_hospital,
+                is_active=True,
+            )
+            user = membership.user
+        except HospitalMembership.DoesNotExist:
             raise serializers.ValidationError(
-                "User does not have an active membership with this hospital"
+                f"User with ID {user_uuid} does not have an active membership in this hospital"
             )
 
-        # Validate schedule conflicts
-        if self._has_schedule_conflict(data):
-            raise serializers.ValidationError(
-                "Schedule conflict detected with existing assignments"
+        # Validate and get department
+        try:
+            department = Department.objects.get(
+                id=department_uuid,
             )
+        except Department.DoesNotExist:
+            raise serializers.ValidationError(
+                f"Department with ID {department_uuid} does not exist in this hospital"
+            )
+
+        # Check for existing department membership
+        existing_membership = DepartmentMember.objects.filter(
+            user=user,
+            department=department,
+            is_active=True
+        ).exists()
+
+        if existing_membership:
+            raise serializers.ValidationError(
+                "User already has an active membership in this department"
+            )
+
+        # Replace UUIDs with actual model instances
+        data["user"] = user
+        data["department"] = department
+        shifts = data.pop("shifts", [])
+        self._validate_shifts(shifts, data["department"]) # we may pass antoher parameter
+        data["_shifts"] = shifts
 
         # Validate department capacity
         if not self._check_department_capacity(data):
@@ -157,46 +209,54 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
 
         return data
 
-    def _validate_hospital_membership(self, user):
-        request = self.context.get("request")
-        if not request:
-            return False
-
-        current_hospital = request.tenant.hospital_profile
-        return user.hospital_memberships_user.filter(
-            hospital=current_hospital,
-            is_active=True,
-            end_date__gte=timezone.now().date(),
-        ).exists()
-
-    def _has_schedule_conflict(self, data):
-        new_schedule = data.get("schedule_pattern", {})
-        existing_schedules = DepartmentMember.objects.filter(
-            department=data["department"],
-            is_active=True
-        ).exclude(id=self.instance.id if self.instance else None)
-
-        for existing in existing_schedules:
-            existing_schedule = existing.schedule_pattern or {}
-            for day, new_time_slots in new_schedule.items():
-                if day in existing_schedule:
-                    existing_time_slots = existing_schedule[day]
-                    for new_slot in new_time_slots:
-                        new_start = new_slot.get("start")
-                        new_end = new_slot.get("end")
-                        for existing_slot in existing_time_slots:
-                            existing_start = existing_slot.get("start")
-                            existing_end = existing_slot.get("end")
-                            if new_start < existing_end and new_end > existing_start:
-                                return True
-        return False
+    def _validate_shifts(self, shifts, department):
+        for shift in shifts:
+            template_id = shift.get("shift_template")
+            try:
+                template = ShiftTemplate.objects.get(
+                    id=template_id,
+                    department=department
+                )
+                if template.role_requirement != self.initial_data.get("role"):
+                    raise serializers.ValidationError(
+                        f"Shift template {template_id} requires {template.role_requirement} role"
+                    )
+            except ShiftTemplate.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"Invalid shift template ID: {template_id} for this department"
+                )
 
     def _check_department_capacity(self, data):
         department = data["department"]
-        current_staff = department.staff_members.filter(is_active=True).count()
+        current_staff = department.department_members.filter(is_active=True).count()
 
         # Ensure max_staff_capacity exists and handle None
         max_capacity = getattr(department, "max_staff_capacity", None)
         if max_capacity is not None:
             return current_staff < max_capacity  # Allow if under capacity
         return True  # No capacity limit means always valid
+
+    def create(self, validated_data):
+        shifts = validated_data.pop("_shifts", [])
+        member = super().create(validated_data)
+        self._create_shifts(member, shifts)
+        return member
+
+    def _create_shifts(self, member, shifts):
+        for shift in shifts:
+            DepartmentMemberShift.objects.create(
+                department_member=member,
+                shift_template_id=shift["shift_template"],
+                assignment_start=shift.get("start_date", member.start_date),
+                assignment_end=shift.get("end_date", member.end_date)
+            )
+
+    # def to_representation(self, instance):
+    #     """Include shift templates in response"""
+    #     rep = super().to_representation(instance)
+    #     rep['shifts'] = ShiftTemplateSerializer(
+    #         instance.assigned_shifts.select_related('shift_template'),
+    #         many=True
+    #     ).data
+    #     return rep
+

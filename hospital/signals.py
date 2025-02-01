@@ -1,5 +1,6 @@
 import logging
 
+from django.apps import apps
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -60,10 +61,10 @@ def create_staff_profile(sender, instance, created, **kwargs):
     try:
         if instance.role.name in ["Doctor", "Nurse", "Lab Technician"]:
             user = instance.user
-
+            profile = apps.get_model("staff", f"{instance.role.name}Profile")
             # Atomic transaction to ensure consistency
             with schema_context(instance.tenant.schema_name), transaction.atomic():
-                DoctorProfile.objects.get_or_create(user=user)
+                profile.objects.get_or_create(user=user)
     except (ValidationError, AttributeError, transaction.TransactionManagementError) as unexpected_error:
         logger.critical(f"Specific error in staff profile creation: {unexpected_error}")
 

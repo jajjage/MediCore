@@ -18,7 +18,7 @@ from apps.patients.serializers import (
     RecurringAppointmentSerializer,
     TimeSlotSerializer,
 )
-from apps.patients.services.appointment_service import (
+from apps.scheduling.services.schedule_service import (
     AppointmentService,
     AppointmentTimeConflictError,
     AppointmentTimeService,
@@ -85,9 +85,10 @@ class PatientAppointmentViewSet(BaseViewSet):
         try:
             try:
                 schedule = SchedulePatternService.get_schedule_pattern(
-                    physician_id=serializer.validated_data["physician"],
+                    physician_id=serializer.validated_data["user"],
                     department_id=serializer.validated_data["department"]
                 )
+                print(schedule)
                 AppointmentTimeService.is_within_schedule(schedule, serializer.validated_data["start_time"])
             except AppointmentTimeConflictError as e:
                 return self.error_response(

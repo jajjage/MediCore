@@ -10,7 +10,6 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.staff.utils.exceptions import BusinessLogicError
-from apps.staff.utils.validators import validate_schedule_pattern
 
 from .departments import Department
 from .staff_transfer import StaffTransfer
@@ -81,12 +80,6 @@ class DepartmentMember(models.Model):
         decimal_places=2,
         help_text="Percentage of time allocated to this department",
         validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))]
-    )
-
-    schedule_pattern = models.JSONField(
-        default=dict,
-        help_text="Weekly/monthly schedule pattern",
-        validators=[validate_schedule_pattern]
     )
 
     # Meta
@@ -190,7 +183,7 @@ class DepartmentMember(models.Model):
                 print(f"_validate_role_changes {old_role}")
                 if old_role and old_role != self.role:
                     # Check if role change is allowed
-                    if self.transfer_in_progress():
+                    if self.transfer_in_progress(): #This need to be created
                         raise ValidationError("Cannot change role during transfer")
 
                     # Validate department head changes
@@ -244,11 +237,11 @@ class DepartmentMember(models.Model):
                 start_date=effective_date,
                 assignment_type="TRANSFER",
                 time_allocation=kwargs.get("time_allocation", self.time_allocation),
-                schedule_pattern=kwargs.get("schedule_pattern", self.schedule_pattern),
                 max_weekly_hours=kwargs.get("max_weekly_hours", self.max_weekly_hours),
                 rest_period_hours=self.rest_period_hours,
                 is_emergency_response=self.is_emergency_response,
                 is_primary=self.is_primary
+                #Shift need to be created
             )
 
             # Create transfer record with enhanced tracking
@@ -369,7 +362,7 @@ class DepartmentMember(models.Model):
         ).order_by("-start_date")
 
     @classmethod
-    def get_staff_workload(cls, staff_member, date=None):  # noqa: ARG003
+    def get_staff_workload(cls, staff_member, date=None):
         """Get detailed workload analysis for a staff member."""
         assignments = cls.objects.filter(
             user=staff_member,
@@ -383,7 +376,7 @@ class DepartmentMember(models.Model):
                     "department": a.department.name,
                     "role": a.get_role_display(),
                     "allocation": a.time_allocation,
-                    "schedule": a.schedule_pattern
+                    # "schedule": a.schedule_pattern, we need to fecth the user generated shift
                 } for a in assignments
             ],
             "weekly_hours": sum(a.max_weekly_hours for a in assignments)

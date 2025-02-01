@@ -21,7 +21,7 @@ class PatientAppointment(PatientBasemodel):
         related_name="appointments"
     )
     physician = models.ForeignKey(
-       "staff.DoctorProfile",
+        settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="appointments",
     )

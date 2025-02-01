@@ -54,6 +54,8 @@ django-filter = "2.4.0"
 django-rest-knox = "4.1.0"
 cryptography = "^44.0.0"
 django-simple-history = "^3.7.0"
+flower = "2.0.1"
+django-celery-results = "^2.5.1"
 
 
 [tool.poetry.group.test.dependencies]
@@ -86,6 +88,7 @@ m2r2 = "^0.3"
 psycopg2-binary = "^2.9.6"
 tomli = "^2.0.1"
 doc8 = ">=0.11,<1.2"
+
 
 [tool.black]
 target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
@@ -133,6 +136,7 @@ ignore = [
     "N806",     # Variable in function should be lowercase
     "ARG001",   # Argument should be lowercase
     "F401",     # Use of `assert` detected
+    "ARG003",   # Avoid using mutable default arguments
 ]
 
 [tool.ruff.lint.per-file-ignores]

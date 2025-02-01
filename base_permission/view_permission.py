@@ -219,7 +219,7 @@ class RolePermission(BasePermission):
 
             return permission in model_permissions
         except AttributeError:
-            raise PermissionDenied("User does not have a valid hospital membership role.")
+            raise PermissionDenied("Authentication credentials were not provided.")
         except (ValueError, Role.DoesNotExist) as e:
             raise PermissionDenied(f"Error: {e}")
 
@@ -264,6 +264,6 @@ class PermissionCheckedSerializerMixin:
             result = permission_type in model_permissions
             return result
         except AttributeError:
-            raise PermissionDenied("User does not have a valid hospital membership role.")
+            raise PermissionDenied("Authentication credentials were not provided.")
         except (ValueError, Role.DoesNotExist) as e:
             raise PermissionDenied(f"Error: {e}")
