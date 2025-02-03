@@ -1,34 +1,35 @@
 from celery import shared_task
-
-# scheduling/tasks.py
 from celery.utils.log import get_task_logger
+from django import db
+from django.db import DatabaseError, OperationalError
+from django_tenants.utils import schema_context
 
 from .utils.shift_generator import ShiftGenerator
 
 logger = get_task_logger(__name__)
 
-@shared_task
-def generate_shifts():
-    try:
-        generator = ShiftGenerator()
-        count = generator.generate_shifts()
-        logger.info(f"Generated {count} shifts")
-        return count
-    except Exception as e:
-        logger.exception("Shift generation failed: %s", str(e))
-        raise generate_shifts.retry(exc=e, countdown=300)  # Retry after 5 minutes
 
-@shared_task
-def generate_initial_shifts(member_id):
-    from .models import DepartmentMember
-    member = DepartmentMember.objects.get(id=member_id)
-    generator = ShiftGenerator()
+@shared_task(bind=True, max_retries=3)
+def generate_shifts(self, tenant_schema):
+      with schema_context(tenant_schema):
+        try:
+            generator = ShiftGenerator(lookahead_weeks=2)
+            count = generator.generate_shifts()
+            return f"Generated {count} shifts"
+        except (DatabaseError, OperationalError) as e:
+            print(f"Shift generation failed: {e!s}")
+            # Retry after 5 seconds instead of 5 minutes for testing
+            raise self.retry(exc=e, countdown=5)
 
-    # Generate shifts for first month
-    generator.generate_shifts_for_member(member, lookahead_weeks=4)
-
-    # Send confirmation
-    # member.user.send_notification(
-    #     title="Your Schedule",
-    #     message=f"Shifts generated for {member.department.name}"
-    # )
+@shared_task(bind=True, max_retries=3)
+def generate_monthly_shifts(self, tenant_schema):
+    """Prime future assignments 3 months ahead."""
+    with schema_context(tenant_schema):
+        try:
+            generator = ShiftGenerator(lookahead_weeks=12)  # ~3 months
+            count = generator.generate_shifts(future_mode=True)
+            return f"Generated {count} shifts"
+        except (DatabaseError, OperationalError) as e:
+            print(f"Shift generation failed: {e!s}")
+            # Retry after 5 seconds instead of 5 minutes for testing
+            raise self.retry(exc=e, countdown=5)

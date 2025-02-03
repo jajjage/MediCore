@@ -233,10 +233,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = "static/"
-# STATIC_ROOT = str(BASE_DIR / "staticfiles")
-# STATICFILES_DIRS = [
-#     str(BASE_DIR / "static"),
-# ]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -252,23 +248,17 @@ PUBLIC_SCHEMA_NAME = "public"
 
 LOGGING = {
     "version": 1,
-    "disable_existing_loggers": False,
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
         },
-        "file": {
-            "class": "logging.FileHandler",
-            "filename": "debug.log",
-        },
     },
     "loggers": {
-        "core.authentication": {
-            "handlers": ["console", "file"],
+        "scheduling": {
+            "handlers": ["console"],
             "level": "DEBUG",
-            "propagate": True,
-        },
-    },
+        }
+    }
 }
 
 CORS_ALLOWED_ORIGINS = str(env("CORS_ALLOWED_ORIGINS", default="*")).split(",")
@@ -312,9 +302,16 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 
 
+# settings.py
 CELERY_BEAT_SCHEDULE = {
-    "generate-shifts-every-day": {
-        "task": "apps.scheduling.tasks.generate_shifts",
-        "schedule": crontab(hour=2, minute=30),  # 2:30 AM daily
+    # Daily: Maintain 14-day window
+    "generate-shifts-daily": {
+        "task": "scheduling.tasks.generate_daily_shifts",
+        "schedule": crontab(hour=3, minute=0),
+    },
+    # Monthly: Prepare future assignments
+    "generate-shifts-monthly": {
+        "task": "scheduling.tasks.generate_monthly_shifts",
+        "schedule": crontab(day_of_month=1, hour=4, minute=0),
     },
 }

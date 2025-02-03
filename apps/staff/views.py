@@ -1,7 +1,8 @@
 import logging
 
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Sum
+from django.db.transaction import on_commit
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -200,15 +201,26 @@ class DepartmentMemberViewSet(BaseViewSet):
     queryset = DepartmentMember.objects.select_related("department", "user")
 
     def perform_create(self, serializer):
-        from apps.scheduling.tasks import generate_initial_shifts
-        generate_initial_shifts.delay(serializer.instance.id)
+        schema_name = connection.schema_name
+        try:
+            with transaction.atomic():
+                from apps.scheduling.tasks import generate_shifts
+                instance = serializer.save()
+                # Queue the task only after the transaction is committed
+                on_commit(lambda: generate_shifts.delay(schema_name))
+                instance = serializer.save()
+                print(f"Instance created successfully: {instance.id}")
 
-        headers = self.get_success_headers(serializer.data)
-        return self.success_response(
-            data=serializer.data,
-            status=status.HTTP_201_CREATED,
-            message=headers
-        )
+            headers = self.get_success_headers(serializer.data)
+            return self.success_response(
+                data=serializer.data,
+                status_code=status.HTTP_201_CREATED,
+                message=headers
+            )
+        except Exception as e:
+            print(f"Error in perform_create: {e!s}")
+            print(f"Error type: {type(e)}")
+            raise
 
     @action(detail=True, methods=["get"])
     def workload_analysis(self, request, pk=None):

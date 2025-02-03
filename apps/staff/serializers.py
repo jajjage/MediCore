@@ -1,12 +1,14 @@
+from types import SimpleNamespace
+
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import serializers
 
 from apps.patients.mixins.patients_mixins import CalculationMixin
 from apps.scheduling.models import DepartmentMemberShift, ShiftTemplate
 from apps.scheduling.utils.shift_generator import ShiftGenerator
-from core.models import MyUser
 from hospital.models.hospital_members import HospitalMembership
 
 from .models import (
@@ -129,7 +131,7 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
         model = DepartmentMember
         fields = ["id", "department", "user", "user_details", "role", "start_date", "end_date",
                  "is_primary", "assignment_type", "time_allocation", "emergency_contact",
-                 "workload", "transfers", "is_active", "shifts"]
+                 "workload", "transfers", "is_active", "shifts", "max_weekly_hours"]
         read_only_fields = ["id", "workload", "transfers"]
         extra_kwargs = {
             "user": {"required": True},
@@ -148,10 +150,6 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
         user_uuid = data.get("user")
         department_uuid = data.get("department")
         request = self.context.get("request")
-        generator = ShiftGenerator()
-        projected = generator.calculate_projected_hours(data)
-        if projected > data["department_member"].max_weekly_hours:
-            raise serializers.ValidationError("Exceeds weekly hour limit")
 
         if not request or not hasattr(request, "tenant") or not hasattr(request.tenant, "hospital_profile"):
             raise serializers.ValidationError("Invalid tenant configuration")
@@ -198,7 +196,9 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
         data["user"] = user
         data["department"] = department
         shifts = data.pop("shifts", [])
-        self._validate_shifts(shifts, data["department"]) # we may pass antoher parameter
+        member = DepartmentMember(**data)
+        self._validate_shifts(shifts, data["department"])
+        self._validate_max_hourly(shifts, member)
         data["_shifts"] = shifts
 
         # Validate department capacity
@@ -206,12 +206,22 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Department has reached maximum staff capacity"
             )
+        # print(data)
 
         return data
 
     def _validate_shifts(self, shifts, department):
         for shift in shifts:
             template_id = shift.get("shift_template")
+            # Validate dates
+            try:
+                if "start_date" in shift:
+                    parse_date(shift["start_date"])
+                if "end_date" in shift:
+                    parse_date(shift["end_date"])
+            except ValueError:
+                raise serializers.ValidationError("Invalid date format. Use YYYY-MM-DD")
+
             try:
                 template = ShiftTemplate.objects.get(
                     id=template_id,
@@ -226,7 +236,9 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
                     f"Invalid shift template ID: {template_id} for this department"
                 )
 
+
     def _check_department_capacity(self, data):
+        print("emergency")
         department = data["department"]
         current_staff = department.department_members.filter(is_active=True).count()
 
@@ -237,26 +249,92 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
         return True  # No capacity limit means always valid
 
     def create(self, validated_data):
+        # First ensure we have proper model instances
+        if isinstance(validated_data.get("user"), dict):
+            user_id = validated_data["user"].get("id")
+            validated_data["user"] = User.objects.get(id=user_id)
+
+        if isinstance(validated_data.get("department"), dict):
+            dept_id = validated_data["department"].get("id")
+            validated_data["department"] = Department.objects.get(id=dept_id)
+
+        # Get shifts data before creating member
         shifts = validated_data.pop("_shifts", [])
-        member = super().create(validated_data)
-        self._create_shifts(member, shifts)
-        return member
+
+        try:
+            # Create the department member
+            member = DepartmentMember.objects.create(
+                user=validated_data["user"],
+                department=validated_data["department"],
+                role=validated_data.get("role"),
+                start_date=validated_data.get("start_date"),
+                end_date=validated_data.get("end_date"),
+                is_primary=validated_data.get("is_primary", False),
+                assignment_type=validated_data.get("assignment_type"),
+                time_allocation=validated_data.get("time_allocation"),
+                emergency_contact=validated_data.get("emergency_contact")
+            )
+
+            # Create associated shifts
+            self._create_shifts(member, shifts)
+
+            return member
+
+        except User.DoesNotExist as e:
+            raise serializers.ValidationError(f"User does not exist: {e!s}")
+        except Department.DoesNotExist as e:
+            raise serializers.ValidationError(f"Department does not exist: {e!s}")
+        except ValueError as e:
+            raise serializers.ValidationError(f"Value error: {e!s}")
+        except TypeError as e:
+            raise serializers.ValidationError(f"Type error: {e!s}")
+        except Exception as e:  # noqa: BLE001
+            raise serializers.ValidationError(f"Unexpected error: {e!s}")
 
     def _create_shifts(self, member, shifts):
         for shift in shifts:
+            # Ensure dates are properly parsed
+            start_date = parse_date(shift.get("start_date", member.start_date))
+            end_date = parse_date(shift.get("end_date", member.end_date)) if shift.get("end_date") else None
+
             DepartmentMemberShift.objects.create(
                 department_member=member,
                 shift_template_id=shift["shift_template"],
-                assignment_start=shift.get("start_date", member.start_date),
-                assignment_end=shift.get("end_date", member.end_date)
+                assignment_start=start_date,
+                assignment_end=end_date
             )
 
-    # def to_representation(self, instance):
-    #     """Include shift templates in response"""
-    #     rep = super().to_representation(instance)
-    #     rep['shifts'] = ShiftTemplateSerializer(
-    #         instance.assigned_shifts.select_related('shift_template'),
-    #         many=True
-    #     ).data
-    #     return rep
+    def _validate_max_hourly(self, shifts, member):
+        if shifts:
+            generator = ShiftGenerator()
+
+            try:
+                # Create a temporary complete member object
+                temp_member = SimpleNamespace(
+                    user=member.user,
+                    department=member.department,
+                    start_date=member.start_date,
+                    end_date=member.end_date,
+                    max_weekly_hours=getattr(member, "max_weekly_hours", 40)  # Default to 40 if not set
+                )
+
+                # Calculate projected hours from raw shift data
+                projected_hours = generator.calculate_projected_hours_for_data(
+                    member=temp_member,
+                    shift_data=shifts
+                )
+
+                # Convert projected_hours to float/int if it isn't already
+                projected_hours = float(projected_hours) if projected_hours else 0
+                max_hours = float(temp_member.max_weekly_hours) if temp_member.max_weekly_hours else 0
+
+                if projected_hours > max_hours:
+                    raise serializers.ValidationError(
+                        f"Projected {projected_hours}h exceeds weekly limit of {max_hours}h"
+                    )
+            except ShiftTemplate.DoesNotExist as e:
+                raise serializers.ValidationError(f"Invalid shift template: {e!s}")
+            except AttributeError as e:
+                # Add better error handling
+                raise serializers.ValidationError(f"Invalid member data: {e!s}")
 

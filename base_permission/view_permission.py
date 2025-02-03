@@ -162,9 +162,6 @@ class RolePermission(BasePermission):
             resource_ = resource.replace("-", " ")
             normalized_resource = "".join(word for word in resource_.split())
             action = view.action
-            print(f"Action received: {action}")
-            print(f"res {normalized_resource}")
-
 
             # Map DRF actions to permissions
             action_to_permission = {
@@ -185,7 +182,6 @@ class RolePermission(BasePermission):
                 "create_recurring": "add"
             }
             permission = action_to_permission.get(action)
-            print(f"Resolved permission for action '{action}': {permission}")
 
             if not permission:
                 return False
@@ -204,7 +200,6 @@ class RolePermission(BasePermission):
                 permissions_dict = convert_queryset_to_role_permissions(
                     permissions_queryset
                 )
-                print(f"Permissions dict: {permissions_dict}")
                 # Cache the permissions for 1 hour
                 cache.set(cache_key, permissions_dict, timeout=3600)
                 permissions = permissions_dict

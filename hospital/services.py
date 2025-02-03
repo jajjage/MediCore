@@ -93,7 +93,7 @@ class TenantCreationService:
         hospital_profile = HospitalProfile.objects.create(
             tenant=tenant,
             hospital_name=validated_data["hospital_name"],
-            hospital_code=validated_data["hospital_code"],
+            hospital_code=validated_data["hospital_code"].upper(),
             license_number=validated_data["license_number"],
             contact_email=validated_data["contact_email"],
             contact_phone=validated_data["contact_phone"],

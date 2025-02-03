@@ -49,15 +49,9 @@ class ShiftTemplateSerializer(serializers.ModelSerializer):
             })
 
         # Validate recurrence_parameters format based on recurrence type
-        if data.get("recurrence") and data.get("recurrence_parameters"):
-            if data["recurrence"] == "WEEKLY" and not isinstance(data["recurrence_parameters"].get("days"), list):
-                    raise serializers.ValidationError({
-                        "recurrence_parameters": "Weekly recurrence must include days list"
-                    })
-
-            if not isinstance(data["recurrence_parameters"].get("interval"), int):
-                raise serializers.ValidationError({
-                    "recurrence_parameters": "Interval must be an integer"
-                })
+        if data.get("recurrence") == "WEEKLY" and data.get("recurrence_parameters") and not isinstance(data["recurrence_parameters"].get("days"), list):
+            raise serializers.ValidationError({
+                "recurrence_parameters": "Weekly recurrence must include days list"
+            })
 
         return data

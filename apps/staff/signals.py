@@ -2,9 +2,9 @@
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from apps.patients.services.appointment_service import SchedulePatternService
+from apps.scheduling.models import GeneratedShift
 
-from .models import GeneratedShift, WorkloadAssignment
+from .models import WorkloadAssignment
 
 
 @receiver(post_save, sender=GeneratedShift)

@@ -53,6 +53,17 @@ class ShiftTemplate(models.Model):
     def __str__(self):
         return f"{self.department} - {self.name}"
 
+    # In ShiftTemplate model
+    def clean(self):
+        if self.recurrence == "WEEKLY" and not self.recurrence_parameters.get("days"):
+            raise ValidationError("Weekly recurrence requires 'days' parameter")
+
+        if self.recurrence == "MONTHLY" and not any(
+            key in self.recurrence_parameters
+            for key in ["day_of_month", "weekday_position"]
+        ):
+            raise ValidationError("Monthly recurrence requires day specification")
+
 
 class DepartmentMemberShift(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

@@ -152,3 +152,6 @@ class MyUser(AbstractBaseUser, PermissionsMixin):
 
     def is_staff_member(self):
         return self.hospital_memberships.filter(role__in=["Doctor", "Durse", "Admin", "Tenant Admin"]).exists()
+
+    def get_full_name(self):
+        return f"{self.first_name} {self.middle_name} {self.last_name}"
