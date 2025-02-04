@@ -9,19 +9,20 @@ from apps.patients.models import (
     PatientAppointment,
 )
 from apps.staff.models.department_member import DepartmentMember
+from apps.staff.models.departments import Department
 from hospital.models.hospital_members import HospitalMembership
 
 from .base_serializer import BasePatientSerializer
 
 
 class PatientAppointmentCreateSerializer(BasePatientSerializer, CalculationMixin):
-    user = serializers.UUIDField(write_only=True)  # For accepting UUID in request
+    physician = serializers.UUIDField(write_only=True)  # For accepting UUID in request
     department = serializers.UUIDField(write_only=True)
     class Meta:
         model = PatientAppointment
         fields = [
             "id",
-            "user",
+            "physician",
             "department",
             "appointment_date",
             "appointment_time",
@@ -46,7 +47,7 @@ class PatientAppointmentCreateSerializer(BasePatientSerializer, CalculationMixin
     def validate(self, data):
         # Validate recurring appointment settings
         department_uuid = data.get("department")
-        user_uuid = data.get("user")
+        user_uuid = data.get("physician")
         request = self.context.get("request")
 
         if not request or not hasattr(request, "tenant") or not hasattr(request.tenant, "hospital_profile"):
@@ -145,9 +146,9 @@ class PatientAppointmentSerializer(BasePatientSerializer, CalculationMixin):
 
     def get_patient_full_name(self, obj):
         return self.format_full_name(
-            obj.patient.first_name,
-            obj.patient.middle_name,
-            obj.patient.last_name
+            obj.patient.user.first_name,
+            obj.patient.user.middle_name,
+            obj.patient.user.last_name
         )
 
     def get_department_name(self, obj):

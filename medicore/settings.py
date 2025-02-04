@@ -246,20 +246,20 @@ TENANT_DOMAIN_MODEL = "tenants.Domain"
 PUBLIC_SCHEMA_NAME = "public"
 
 
-LOGGING = {
-    "version": 1,
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-        },
-    },
-    "loggers": {
-        "scheduling": {
-            "handlers": ["console"],
-            "level": "DEBUG",
-        }
-    }
-}
+# LOGGING = {
+#     "version": 1,
+#     "handlers": {
+#         "console": {
+#             "class": "logging.StreamHandler",
+#         },
+#     },
+#     "loggers": {
+#         "scheduling": {
+#             "handlers": ["console"],
+#             "level": "DEBUG",
+#         }
+#     }
+# }
 
 CORS_ALLOWED_ORIGINS = str(env("CORS_ALLOWED_ORIGINS", default="*")).split(",")
 CORS_ALLOW_METHODS = [
@@ -303,15 +303,15 @@ CELERY_TASK_SERIALIZER = "json"
 
 
 # settings.py
-CELERY_BEAT_SCHEDULE = {
-    # Daily: Maintain 14-day window
-    "generate-shifts-daily": {
-        "task": "scheduling.tasks.generate_daily_shifts",
-        "schedule": crontab(hour=3, minute=0),
-    },
-    # Monthly: Prepare future assignments
-    "generate-shifts-monthly": {
-        "task": "scheduling.tasks.generate_monthly_shifts",
-        "schedule": crontab(day_of_month=1, hour=4, minute=0),
-    },
-}
+# CELERY_BEAT_SCHEDULE = {
+#     # Daily: Maintain 14-day window
+#     "generate-shifts-daily": {
+#         "task": "scheduling.tasks.generate_daily_shifts",
+#         "schedule": crontab(hour=3, minute=0),
+#     },
+#     # Monthly: Prepare future assignments
+#     "generate-shifts-monthly": {
+#         "task": "scheduling.tasks.generate_monthly_shifts",
+#         "schedule": crontab(day_of_month=1, hour=4, minute=0),
+#     },
+# }

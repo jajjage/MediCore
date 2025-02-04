@@ -10,7 +10,7 @@ logger = get_task_logger(__name__)
 
 
 @shared_task(bind=True, max_retries=3)
-def generate_shifts(self, tenant_schema):
+def generate_daily_shifts(self, tenant_schema):
       with schema_context(tenant_schema):
         try:
             generator = ShiftGenerator(lookahead_weeks=2)

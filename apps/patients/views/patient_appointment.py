@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from rest_framework import status
@@ -25,9 +26,10 @@ from apps.scheduling.services.schedule_service import (
     RecurringAppointmentService,
     SchedulePatternService,
 )
+from apps.staff.models.departments import Department
 from base_view import BaseViewSet
 
-
+User = get_user_model()
 class PatientAppointmentViewSet(BaseViewSet):
     """
     ViewSet for managing patient appointments with comprehensive service integration.
@@ -81,12 +83,16 @@ class PatientAppointmentViewSet(BaseViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         is_recurring = serializer.validated_data["is_recurring"]
+        physician_id=serializer.validated_data["physician"]
+        department_id=serializer.validated_data["department"]
+        week_start=serializer.validated_data["appointment_date"]
 
         try:
             try:
                 schedule = SchedulePatternService.get_schedule_pattern(
-                    physician_id=serializer.validated_data["user"],
-                    department_id=serializer.validated_data["department"]
+                    physician_id=physician_id,
+                    department_id=department_id,
+                    week_start=week_start
                 )
                 print(schedule)
                 AppointmentTimeService.is_within_schedule(schedule, serializer.validated_data["start_time"])
@@ -96,9 +102,23 @@ class PatientAppointmentViewSet(BaseViewSet):
                     code=400,
                     status_code=status.HTTP_400_BAD_REQUEST
                 )
+            try:
+                department = Department.objects.get(
+                    id=department_id,
+                )
+                physician = User.objects.get(
+                    id=physician_id,
+                    hospital_memberships_user__role__name="Doctor"
+                )
+            except (Department.DoesNotExist, User.DoesNotExist):
+                raise ValidationError(
+                    f"Department with ID {department_id} does not exist in this hospital"
+                )
 
             appointment = AppointmentService.create_appointment(
                 serializer,
+                department,
+                physician,
                 self.request.user,
                 self.kwargs.get("patient__pk"),
                 is_recurring

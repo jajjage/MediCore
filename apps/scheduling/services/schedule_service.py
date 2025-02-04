@@ -58,20 +58,21 @@ class SchedulePatternService:
     """Service for managing physician schedule patterns."""
 
     @classmethod
-    def get_schedule_pattern(cls, physician_id: str, department_id: str | None = None) -> dict:
+    def get_schedule_pattern(cls, physician_id: str, week_start: date, department_id: str | None = None) -> dict:
         """Get schedule pattern for a physician."""
         # Get current week boundaries
-        today = timezone.now().date()
-        week_start = today - timezone.timedelta(days=today.weekday())
+        week_start = week_start - timezone.timedelta(days=week_start.weekday())
+        print(week_start)
         cache_key = cls._build_cache_key(physician_id, department_id, week_start)
 
         # Try cache first
         if (cached := cache.get(cache_key)) is not None:
-            print(cached)
+            print(f"cached {cached}")
             return cached
 
         # Cache miss - generate fresh data
         schedule = cls._generate_schedule(physician_id, department_id, week_start)
+        print(f"frh {schedule}")
         legacy_format = cls._convert_to_legacy_format(schedule)
 
         # Cache with timeout and versioning
@@ -91,7 +92,8 @@ class SchedulePatternService:
     @classmethod
     def _generate_schedule(cls, physician_id: str, department_id: str | None, week_start: date) -> dict:
         week_end = week_start + timezone.timedelta(days=6)
-
+        print(week_end)
+        print(physician_id, department_id)
          # Get relevant shifts for this week
         shifts = GeneratedShift.objects.filter(
             user_id=physician_id,
@@ -102,6 +104,7 @@ class SchedulePatternService:
 
         if department_id:
             shifts = shifts.filter(department_id=department_id)
+        print(shifts)
 
         # Aggregate shifts by weekday
         schedule = defaultdict(list)
@@ -116,10 +119,9 @@ class SchedulePatternService:
         return schedule
 
     @classmethod
-    def invalidate_cache(cls, physician_id: str, department_id: str | None = None):
+    def invalidate_cache(cls, physician_id: str, week_start: date, department_id: str | None = None):
         """Call this when shifts change for a physician."""
-        today = timezone.now().date()
-        week_start = today - timezone.timedelta(days=today.weekday())
+        week_start = week_start - timezone.timedelta(days=week_start.weekday())
         cache_key = cls._build_cache_key(physician_id, department_id, week_start)
         cache.delete(cache_key)
 
@@ -128,15 +130,16 @@ class SchedulePatternService:
         """Convert dynamic shifts to legacy schedule pattern format."""
         # In _convert_to_legacy_format
         legacy_format = {}
-        for day in ["monday", "tuesday", "wednesday", "thursday",
-                   "friday", "saturday", "sunday"]:
+        days_of_week = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
-            # Block routine appointments on emergency days
-            if any(s["shift_type"] == "EMERGENCY" for s in shifts[day]):
-                legacy_format[day]["max_appointments"] = 0
-
-            if day in shifts:
-                # Take first shift for legacy compatibility
+        for day in days_of_week:
+            # Check if the day exists in shifts and is non-empty
+            if shifts.get(day):
+                # If any shift for the day is emergency, you might want to set max_appointments to 0.
+                if any(s["shift_type"] == "EMERGENCY" for s in shifts[day]):
+                    # If you wish to block appointments when emergency shifts are present
+                    legacy_format[day] = {"max_appointments": 0}
+                # Otherwise, take the first shift for legacy compatibility.
                 primary_shift = shifts[day][0]
                 legacy_format[day] = {
                     "start": primary_shift["start"],
@@ -144,14 +147,16 @@ class SchedulePatternService:
                     "max_appointments": SchedulePatternService._calculate_max_appointments(
                         primary_shift["start"],
                         primary_shift["end"],
-                        slot_duration=30  # Could get from department config
+                        slot_duration=30  # You might retrieve this value from your department config
                     ),
                     "slot_duration": 30
                 }
             else:
+                # For days that are missing or have an empty list, set the value to None.
                 legacy_format[day] = None
 
         return legacy_format
+
 
     @staticmethod
     def _calculate_max_appointments(start: str, end: str, slot_duration: int) -> int:
@@ -396,6 +401,8 @@ class AppointmentService:
     @transaction.atomic
     def create_appointment(
         serializer: Any,
+        department: Any,
+        physician: Any,
         staff_member: Any,
         patient_id: str,
         is_recurring: bool    # noqa: FBT001
@@ -414,6 +421,8 @@ class AppointmentService:
 
         return serializer.save(
             patient_id=patient_id,
+            physician=physician,
+            department=department,
             created_by=staff_member,
             modified_by=staff_member,
             status=AppointmentStatus.PENDING.value
