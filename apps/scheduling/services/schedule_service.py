@@ -405,11 +405,10 @@ class AppointmentService:
         physician: Any,
         staff_member: Any,
         patient_id: str,
-        is_recurring: bool    # noqa: FBT001
     ) -> Any:
         """Create a single or recurring appointment."""
          # Check schedule pattern
-        if is_recurring:
+        if serializer.validated_data["is_recurring"]:
             return RecurringAppointmentService.create_recurring_appointments(
                 serializer, staff_member, patient_id
             )

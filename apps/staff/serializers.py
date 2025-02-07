@@ -272,7 +272,8 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
                 is_primary=validated_data.get("is_primary", False),
                 assignment_type=validated_data.get("assignment_type"),
                 time_allocation=validated_data.get("time_allocation"),
-                emergency_contact=validated_data.get("emergency_contact")
+                emergency_contact=validated_data.get("emergency_contact"),
+                max_weekly_hours=validated_data.get("max_weekly_hours")
             )
 
             # Create associated shifts

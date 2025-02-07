@@ -204,10 +204,10 @@ class DepartmentMemberViewSet(BaseViewSet):
         schema_name = connection.schema_name
         try:
             with transaction.atomic():
-                from apps.scheduling.tasks import generate_shifts
+                from apps.scheduling.tasks import initialize_department_shifts
                 instance = serializer.save()
                 # Queue the task only after the transaction is committed
-                on_commit(lambda: generate_shifts.delay(schema_name))
+                on_commit(lambda: initialize_department_shifts.delay(schema_name))
                 instance = serializer.save()
                 print(f"Instance created successfully: {instance.id}")
 

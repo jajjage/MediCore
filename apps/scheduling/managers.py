@@ -57,22 +57,10 @@ class DepartmentMemberShiftManager(models.Manager):
     def active_assignments(self, future_mode=False):
         now = timezone.now().date()
 
-        base_query = self.filter(
+        return self.filter(
             department_member__is_active=True,
             shift_template__is_active=True,
             shift_template__valid_until__gte=now
         ).select_related("shift_template", "department_member")
 
-        if future_mode:
-            # Get assignments starting in next 3 months
-            return base_query.filter(
-                assignment_start__range=(
-                    now + timedelta(days=45), # 1.5 months ahead
-                    now + timedelta(days=90)   # 3 months ahead
-                )
-            )
-        # Standard rolling window
-        return base_query.filter(
-            Q(assignment_end__gte=now) | Q(assignment_end__isnull=True),
-            assignment_start__lte=now + timedelta(days=14),  # 2 weeks ahead
-        ).select_related("shift_template", "department_member")
+

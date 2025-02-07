@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -42,12 +43,21 @@ class ShiftTemplate(models.Model):
         choices=DepartmentMember.ROLE_TYPES,
         default="DOCTOR"
     )
+    rotation_group = models.CharField(
+        max_length=20,
+        choices=[("MORNING", "Morning"), ("AFTERNOON", "Afternoon"), ("NIGHT", "Night")],
+    )
+    max_consecutive_weeks = models.PositiveIntegerField(
+        default=1,
+        help_text="Max consecutive weeks for this template"
+    )
     max_staff = models.PositiveIntegerField(default=1)
     is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "shift_templates"
-        ordering = ["valid_from", "start_time"]
+        ordering = ["valid_from", "start_time", "rotation_group"]
+        unique_together = ["department", "rotation_group"]
 
 
     def __str__(self):
@@ -156,7 +166,26 @@ class GeneratedShift(models.Model):
             models.Index(fields=["start_datetime", "end_datetime"])
         ]
 
+class UserShiftState(models.Model):
+    """
+    Tracks the current state of a user's shift rotation within a department.
 
+    This ensures continuity when generating shifts incrementally.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="shift_state")
+    department = models.ForeignKey("staff.Department", on_delete=models.CASCADE)
+    current_template = models.ForeignKey("ShiftTemplate", on_delete=models.CASCADE)
+    last_shift_end = models.DateTimeField()
+    rotation_index = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = "user_shift_state"
+        unique_together = ["user", "department"]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.department.name} - {self.current_template.name}"
 
 class ShiftSwapRequest(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

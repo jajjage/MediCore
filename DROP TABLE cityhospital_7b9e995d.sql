@@ -1,0 +1,1 @@
+DROP TABLE cityhospital_7b9e995d.user_rotation_state

@@ -82,7 +82,6 @@ class PatientAppointmentViewSet(BaseViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        is_recurring = serializer.validated_data["is_recurring"]
         physician_id=serializer.validated_data["physician"]
         department_id=serializer.validated_data["department"]
         week_start=serializer.validated_data["appointment_date"]
@@ -121,7 +120,6 @@ class PatientAppointmentViewSet(BaseViewSet):
                 physician,
                 self.request.user,
                 self.kwargs.get("patient__pk"),
-                is_recurring
             )
             return self.success_response(
                 data=PatientAppointmentSerializer(appointment).data,

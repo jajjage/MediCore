@@ -10,9 +10,9 @@ class ShiftTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShiftTemplate
         fields = [
-            "id", "department", "name", "start_time", "end_time",
+            "id", "department", "name", "start_time", "end_time", "rotation_group",
             "recurrence", "recurrence_parameters", "valid_from", "valid_until",
-            "role_requirement", "max_staff", "is_active"
+            "role_requirement", "max_staff", "is_active", "max_consecutive_weeks"
         ]
 
     def validate(self, data):
