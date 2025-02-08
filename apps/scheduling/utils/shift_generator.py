@@ -85,44 +85,56 @@ class ShiftGenerator:
 
     def _process_department_assignments(
         self,
-        department_id: uuid,
+        department_id: uuid.UUID,
         user_assignments: dict[uuid.UUID, list],
         initial_setup: bool,  # noqa: FBT001
-        generation_end_date: date|None
+        generation_end_date: date | None
     ) -> int:
         """
         Process all assignments for a department, maintaining rotation for each user.
         """
         total_generated = 0
 
-        # Process each user's assignments in the department
+        # For initial setup, fetch the user_ids that already have a rotation state for this department.
+        if initial_setup:
+            existing_state_user_ids = set(
+                UserShiftState.objects.filter(department_id=department_id)
+                .values_list("user_id", flat=True)
+            )
+        else:
+            existing_state_user_ids = set()  # Not used in daily generation
+
         user_ids = list(user_assignments.keys())
         try:
             for user_id in user_ids:
+                print(f"Existing rotation State: {existing_state_user_ids} = from _process_department_assignments")
+                # If initial_setup and a rotation state already exists for this user, skip them.
+                if initial_setup and user_id in existing_state_user_ids:
+                    continue
+
                 assignments = user_assignments[user_id]
-                # Sort assignments by template start time to establish rotation order
+                # Sort assignments by template start time to establish rotation order.
                 sorted_assignments = sorted(
                     assignments,
                     key=lambda x: x.shift_template.start_time
                 )
 
-                # Get or create rotation state for this user-department pair
                 if initial_setup:
-                    # For initial setup, don't get existing state
+                    # For initial setup, create a new rotation state only for those without one.
                     rotation_state = self._create_initial_rotation_state(
                         user_id,
                         department_id,
                         sorted_assignments
                     )
                 else:
-                    # For daily generation, get or create state
+                    # For daily generation, get or create the state.
                     rotation_state = self._get_rotation_state(
                         user_id,
                         department_id,
                         sorted_assignments
                     )
 
-                # Generate shifts for this user
+                # Generate shifts for this user.
                 shifts_generated = self._generate_user_shifts(
                     sorted_assignments,
                     rotation_state,
@@ -138,6 +150,7 @@ class ShiftGenerator:
             )
 
         return total_generated
+
 
     def _create_initial_rotation_state(
         self,
@@ -211,111 +224,95 @@ class ShiftGenerator:
         self,
         assignments: list,
         rotation_state: UserShiftState,
-        initial_setup: bool,           # True for bulk (initial) creation  # noqa: FBT001
+        initial_setup: bool,           # True for initial (bulk) creation; False for daily/batch generation  # noqa: FBT001
         generation_end_date: date | None,
         batch_days: int = 7             # Used for daily generation if generation_end_date is not provided
     ) -> int:
         """
-        Generate shifts for a single user.
+        Generate shifts for a single user using calculate_dates for recurrence.
 
-        When initial_setup is True:
-        - If today is not Monday, start from the next Monday.
-        - Use the remainder of the current month as the generation window.
-        - For every weekday in that window, create a shift.
-        - Group the weekdays in blocks of 5. All 5 shifts in a block use the same shift template.
-            (E.g. if rotation_state.rotation_index == 0, the first 5 weekdays use assignments[0];
-            the next 5 weekdays use assignments[1] and so on.)
-
-        When initial_setup is False (daily generation), a similar logic is applied to a shorter window.
+        For initial_setup:
+        - Determine a generation window starting from the next Monday (if today is not Monday)
+            until the last day of the current month.
+        - Divide that window into 7 day blocks.
+        - For each block, use calculate_dates (with ignore_now=True) to get candidate dates.
+        - For every candidate date within the block (i.e. every valid weekday),
+            create a shift using the same shift template.
+        - Advance the rotation state by one block (i.e. one template per block).
+               For daily generation (initial_setup=False), a similar logic applies but on a shorter window.
         """
         shifts_generated = 0
         today = timezone.now().date()
 
         if initial_setup:
-            # For initial setup, we want to schedule shifts for the remainder of the month.
+            # For initial setup, we want to schedule for the remainder of the current month.
             # If today is not Monday, start from the next Monday.
             if today.weekday() == 0:
                 start_date = today
             else:
-                # weekday() returns 0 for Monday ... 6 for Sunday.
                 days_until_monday = (7 - today.weekday())
                 start_date = today + timedelta(days=days_until_monday)
-
-            # Use the last day of the current month as the end date.
-            last_day_of_month = calendar.monthrange(start_date.year, start_date.month)[1]
-            end_date = date(start_date.year, start_date.month, last_day_of_month)
-
-            # Build a list of all weekdays (Monday to Friday) between start_date and end_date.
-            candidate_dates = []
-            current = start_date
-            while current <= end_date:
-                if current.weekday() < WORK_WEEK_LAST_DAY:  # 0=Mon, ... 4=Fri
-                    candidate_dates.append(current)
-                current += timedelta(days=1)
-
-            # Now assign a shift on each candidate date—but use the same template for each block of 5 weekdays.
-            # For example, if there are 15 candidate dates, then:
-            #   - The first 5 use assignments[ rotation_state.rotation_index ]
-            #   - The next 5 use assignments[ (rotation_state.rotation_index + 1) % len(assignments) ]
-            #   - The last 5 use assignments[ (rotation_state.rotation_index + 2) % len(assignments) ]
-            count = 0  # counts how many valid days we've processed
-            for d in candidate_dates:
-                # Determine the block index (each block has 5 weekdays)
-                block_index = count // 5
-                # Determine which assignment (shift template) to use:
-                template_index = (rotation_state.rotation_index + block_index) % len(assignments)
-                current_assignment = assignments[template_index]
-
-                # Check if a shift already exists on that date for this assignment.
-                # (We wrap d in a list because _shift_exists expects an iterable.)
-                if d not in self._shift_exists(current_assignment, [d]):
-                    self._create_shift(current_assignment, d)
-                    shifts_generated += 1
-                count += 1
-
-            # Update the rotation state.
-            # Advance the rotation index by the number of complete blocks processed.
-            blocks_completed = count // 5
-            rotation_state.rotation_index = (rotation_state.rotation_index + blocks_completed) % len(assignments)
-            # Set last_shift_end to the end of the last created shift.
-            # (Here we assume _calculate_shift_end returns a datetime for a given date using the templates end time.)
-            if candidate_dates:
-                last_date = candidate_dates[-1]
-                # Use the template that was used in the last block.
-                last_template_index = (rotation_state.rotation_index - 1) % len(assignments)
-                last_assignment = assignments[last_template_index]
-                rotation_state.last_shift_end = self._calculate_shift_end(last_assignment.shift_template, last_date)
-            rotation_state.save()
-
+            # End date is the last day of the current month.
+            last_day = calendar.monthrange(start_date.year, start_date.month)[1]
+            end_date = date(start_date.year, start_date.month, last_day)
+            ignore_now = True
         else:
-            # Daily (or batch) generation: use a smaller window (by default batch_days ahead)
+            # For daily/batch generation, use a shorter window.
             start_date = today
             end_date = generation_end_date if generation_end_date else (start_date + timedelta(days=batch_days))
-            # Build list of weekdays between start_date and end_date.
-            candidate_dates = []
-            current = start_date
-            while current <= end_date:
-                if current.weekday() < WORK_WEEK_LAST_DAY:
-                    candidate_dates.append(current)
-                current += timedelta(days=1)
+            ignore_now = False
 
-            count = 0
-            for d in candidate_dates:
-                block_index = count // 5
-                template_index = (rotation_state.rotation_index + block_index) % len(assignments)
-                current_assignment = assignments[template_index]
-                if d not in self._shift_exists(current_assignment, [d]):
-                    self._create_shift(current_assignment, d)
+        # Process in blocks of 7 days (each block ideally covers 5 weekdays).
+        block_count = 0  # number of blocks processed
+        current_block_start = start_date
+
+        while current_block_start <= end_date:
+            # Define the current block: from current_block_start through 4 days later.
+            # This block is meant to capture Monday through Friday.
+            block_end = current_block_start + timedelta(days=4)
+            block_end = min(block_end, end_date)
+
+            # Determine which assignment (i.e. shift template) to use for this block.
+            template_index = (rotation_state.rotation_index + block_count) % len(assignments)
+            current_assignment = assignments[template_index]
+
+            # Use calculate_dates to get candidate datetimes for the current assignment.
+            candidate_datetimes = self.calculate_dates(
+                current_assignment,
+                next_start_date=current_block_start,
+                ignore_now=ignore_now
+            )
+            # Convert candidate datetimes to dates.
+            candidate_dates = [dt.date() for dt in candidate_datetimes]
+            # Filter the candidate dates to those falling within this block.
+            block_candidate_dates = [d for d in candidate_dates if current_block_start <= d <= block_end]
+            # Optionally, enforce that they are weekdays (0=Mon, ..., 4=Fri):
+            block_candidate_dates = [d for d in block_candidate_dates if d.weekday() < WORK_WEEK_LAST_DAY]
+
+            # Instead of choosing just one date, iterate over all candidate dates in this block.
+            for chosen_date in block_candidate_dates:
+                # Check if a shift already exists for this candidate date.
+                if chosen_date not in self._shift_exists(current_assignment, [chosen_date]):
+                    self._create_shift(current_assignment, chosen_date)
                     shifts_generated += 1
-                count += 1
-            blocks_completed = count // 5
-            rotation_state.rotation_index = (rotation_state.rotation_index + blocks_completed) % len(assignments)
-            if candidate_dates:
-                last_date = candidate_dates[-1]
-                last_template_index = (rotation_state.rotation_index - 1) % len(assignments)
-                last_assignment = assignments[last_template_index]
-                rotation_state.last_shift_end = self._calculate_shift_end(last_assignment.shift_template, last_date)
-            rotation_state.save()
+
+            # Advance to the next block.
+            block_count += 1
+            current_block_start += timedelta(days=7)
+
+        # Update rotation state after processing all blocks.
+        rotation_state.rotation_index = (rotation_state.rotation_index + block_count) % len(assignments)
+        # Update last_shift_end to reflect the end of the generation window.
+        if shifts_generated:
+            # For example, set last_shift_end using the end_date and the last used template.
+            last_template_index = (rotation_state.rotation_index - 1) % len(assignments)
+            last_assignment = assignments[last_template_index]
+            rotation_state.last_shift_end = self._calculate_shift_end(last_assignment.shift_template, end_date)
+        else:
+            # Fallback in case no shift was created.
+            last_template = assignments[(rotation_state.rotation_index - 1) % len(assignments)]
+            rotation_state.last_shift_end = self.combine_date_time(end_date, last_template.shift_template.end_time)
+        rotation_state.save()
 
         return shifts_generated
 
@@ -387,8 +384,6 @@ class ShiftGenerator:
         except Exception as e:
             logger.exception(f"Date calculation error: {e}")
             return []
-
-
 
     def get_recurrence_dates(self, template, start_dt, end_dt):
         """Generate datetime objects for the recurrence rule."""
