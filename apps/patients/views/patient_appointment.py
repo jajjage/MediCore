@@ -45,26 +45,6 @@ class PatientAppointmentViewSet(BaseViewSet):
                 "created_by",
                 "modified_by"
             )
-    # def get_queryset(self):
-    #     user = self.request.user
-    #     queryset = PatientAppointment.objects.all()
-    #     print(dir(user))
-    #     if hasattr(user, "patients"):
-    #         return queryset.filter(
-    #             patient_id=self.kwargs.get("patient__pk")
-    #         ).select_related(
-    #             "physician",
-    #             "department",
-    #             "patient",
-    #             "created_by",
-    #             "modified_by"
-    #         )
-    #     if hasattr(user, "doctor_profile"):
-    #         doctor_id = user.id
-    #         if user.role.name in ["Doctor", "Nurse"]:
-    #             return queryset.filter(physician_id=doctor_id)
-    #         return queryset
-    #     return PatientAppointment.objects.none()
 
     def get_serializer_class(self):
         serializer_map = {

@@ -246,20 +246,20 @@ TENANT_DOMAIN_MODEL = "tenants.Domain"
 PUBLIC_SCHEMA_NAME = "public"
 
 
-LOGGING = {
-    "version": 1,
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-        },
-    },
-    "loggers": {
-        "scheduling": {
-            "handlers": ["console"],
-            "level": "DEBUG",
-        }
-    }
-}
+# LOGGING = {
+#     "version": 1,
+#     "handlers": {
+#         "console": {
+#             "class": "logging.StreamHandler",
+#         },
+#     },
+#     "loggers": {
+#         "scheduling": {
+#             "handlers": ["console"],
+#             "level": "DEBUG",
+#         }
+#     }
+# }
 
 CORS_ALLOWED_ORIGINS = str(env("CORS_ALLOWED_ORIGINS", default="*")).split(",")
 CORS_ALLOW_METHODS = [

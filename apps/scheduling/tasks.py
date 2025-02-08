@@ -2,7 +2,7 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 from django import db
 from django.contrib.auth import get_user_model
-from django.db import DatabaseError, OperationalError
+from django.db import DatabaseError, OperationalError, connection
 from django_tenants.utils import schema_context
 
 from .utils.shift_generator import ShiftGenerator
@@ -10,6 +10,7 @@ from .utils.shift_generator import ShiftGenerator
 logger = get_task_logger(__name__)
 
 User = get_user_model()
+schema_name = connection.schema_name
 
 @shared_task(bind=True, max_retries=3)
 def generate_daily_shifts(self, tenant_schema):
