@@ -4,15 +4,18 @@ from __future__ import annotations
 import calendar
 import logging
 import typing as t
-from datetime import date, datetime, timedelta
+from datetime import date as d
+from datetime import datetime, timedelta
 from types import SimpleNamespace
+from typing import NamedTuple
 
 if t.TYPE_CHECKING:
     import uuid
 
 from dateutil import rrule
+from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
@@ -25,6 +28,13 @@ from apps.scheduling.models import (
 
 logger = logging.getLogger(__name__)
 WORK_WEEK_LAST_DAY = 5  # Friday (0=Monday, 4=Friday, 5=Saturday, 6=Sunday)
+
+class GenerationContext(NamedTuple):
+    initial_setup: bool
+    generation_end_date: d | None
+    new_shift_tracker: dict
+    batch_days: int = 7
+    ignore_now: bool = False
 class ShiftGenerator:
     def __init__(self, lookahead_weeks=4):
         self.lookahead = lookahead_weeks * 7
@@ -42,7 +52,6 @@ class ShiftGenerator:
         """
         # Get all active department member shifts
         active_assignments = DepartmentMemberShift.objects.active_assignments()
-        print(active_assignments)
 
         # Group assignments by department and user
         department_assignments = self._group_assignments(active_assignments)
@@ -73,14 +82,7 @@ class ShiftGenerator:
         for assignment in assignments:
             dept_id = assignment.department_member.department_id
             user_id = assignment.department_member.user_id
-
-            if dept_id not in grouped:
-                grouped[dept_id] = {}
-            if user_id not in grouped[dept_id]:
-                grouped[dept_id][user_id] = []
-
-            grouped[dept_id][user_id].append(assignment)
-
+            grouped.setdefault(dept_id, {}).setdefault(user_id, []).append(assignment)
         return grouped
 
     def _process_department_assignments(
@@ -88,13 +90,13 @@ class ShiftGenerator:
         department_id: uuid.UUID,
         user_assignments: dict[uuid.UUID, list],
         initial_setup: bool,  # noqa: FBT001
-        generation_end_date: date | None
+        generation_end_date: d | None
     ) -> int:
         """
         Process all assignments for a department, maintaining rotation for each user.
         """
         total_generated = 0
-
+        department_new_shifts = {}
         # For initial setup, fetch the user_ids that already have a rotation state for this department.
         if initial_setup:
             existing_state_user_ids = set(
@@ -135,11 +137,15 @@ class ShiftGenerator:
                     )
 
                 # Generate shifts for this user.
+                context = GenerationContext(
+                    initial_setup=initial_setup,
+                    generation_end_date= generation_end_date,
+                    new_shift_tracker=department_new_shifts
+                )
                 shifts_generated = self._generate_user_shifts(
                     sorted_assignments,
                     rotation_state,
-                    initial_setup,
-                    generation_end_date
+                    context
                 )
                 total_generated += shifts_generated
 
@@ -220,110 +226,168 @@ class ShiftGenerator:
                 last_shift_end=last_shift.end_datetime if last_shift else timezone.now(),
                 rotation_index=initial_index
             )
+
+    def _get_existing_shift_counts(self, template, candidate_dates: list[d]) -> dict:
+        qs = GeneratedShift.objects.filter(
+            source_template=template,
+            department=template.department,
+            start_datetime__date__in=candidate_dates
+        ).values("start_datetime__date").annotate(count=Count("id"))
+        return {item["start_datetime__date"]: item["count"] for item in qs}
+
     def _generate_user_shifts(
         self,
         assignments: list,
         rotation_state: UserShiftState,
-        initial_setup: bool,           # True for initial (bulk) creation; False for daily generation  # noqa: FBT001
-        generation_end_date: date | None,
-        batch_days: int = 7             # Used for daily generation if generation_end_date is not provided
+        context: GenerationContext,
     ) -> int:
         """
-        Generate shifts for a single user using calculate_dates for recurrence, taking into account a template's interval.
+        Generate shifts for a single doctor (user) while enforcing department-level staffing constraints.
 
-        For initial_setup:
-        - Determine a generation window from the next Monday (if today isn't Monday)
-            until the last day of the current month.
-        - Divide that window into 7-day blocks.
-        - For each block, iterate over the templates in rotation (starting from the current rotation index)
-            and call calculate_dates (with ignore_now=True) to get candidate dates.
-        - If a template returns candidate dates (non-empty), create shifts for every candidate
-            in that block using that template, and update the rotation state to the next template.
-        - If no template yields candidate dates, skip creating a shift for that block and advance rotation.
-        - Continue until the end of the generation window.
-        For daily generation (initial_setup==False), a similar approach is used on a shorter window.
+        Args:
+            assignments: List of shift assignments for the user
+            rotation_state: Current rotation state for the user
+            context: Dictionary containing:
+
         """
         shifts_generated = 0
-        today = timezone.now().date()
+        start_date, end_date = self._get_generation_window(context)
+        current_block = start_date
 
-        if initial_setup:
-            # For initial setup, start from the next Monday if today is not Monday.
-            if today.weekday() == 0:  # Monday
-                start_date = today
-            else:
-                days_until_monday = (7 - today.weekday())
-                start_date = today + timedelta(days=days_until_monday)
-            # End date: last day of the current month.
-            last_day = calendar.monthrange(start_date.year, start_date.month)[1]
-            end_date = date(start_date.year, start_date.month, last_day)
-            ignore_now = True
-        else:
-            # For daily/batch generation, use a smaller window.
-            start_date = today
-            end_date = generation_end_date if generation_end_date else (start_date + timedelta(days=batch_days))
-            ignore_now = False
+        while current_block <= end_date:
+            block_shifts = self._process_week_block(
+                assignments,
+                rotation_state,
+                current_block,
+                end_date,
+                context
+            )
+            shifts_generated += block_shifts
+            current_block += timedelta(days=7)
 
-        # Process the window in blocks of 7 days.
-        current_block_start = start_date
-
-        while current_block_start <= end_date:
-            # Define block_end as 4 days later to capture the 5 weekdays.
-            block_end = current_block_start + timedelta(days=4)
-            block_end = min(block_end, end_date)
-
-            # In this block, try each template (in rotation order) until one yields candidate dates.
-            template_found = False
-            starting_index = rotation_state.rotation_index  # Start with the current rotation index.
-            used_template_index = None
-
-            for i in range(len(assignments)):
-                candidate_index = (starting_index + i) % len(assignments)
-                candidate_assignment = assignments[candidate_index]
-                # Use calculate_dates with ignore_now (which is True for initial_setup)
-                candidate_datetimes = self.calculate_dates(
-                    candidate_assignment,
-                    next_start_date=current_block_start,
-                    ignore_now=ignore_now
-                )
-                # Convert datetimes to dates.
-                candidate_dates = [dt.date() for dt in candidate_datetimes]
-                # Filter candidate dates to those in the current block.
-                block_candidate_dates = [d for d in candidate_dates if current_block_start <= d <= block_end and d.weekday() < WORK_WEEK_LAST_DAY]
-                if block_candidate_dates:
-                    # Found a template that is due in this block.
-                    used_template_index = candidate_index  # noqa: F841
-                    # Create a shift for each candidate date in this block.
-                    for chosen_date in block_candidate_dates:
-                        if chosen_date not in self._shift_exists(candidate_assignment, [chosen_date]):
-                            self._create_shift(candidate_assignment, chosen_date)
-                            shifts_generated += 1
-                    template_found = True
-                    # Advance the rotation state to the template immediately after the one used.
-                    rotation_state.rotation_index = (candidate_index + 1) % len(assignments)
-                    break  # Stop checking further templates for this block.
-
-            if not template_found:
-                # If no template was due for this block (perhaps due to an interval),
-                # simply advance the rotation state by one (to try the next template next time).
-                rotation_state.rotation_index = (rotation_state.rotation_index + 1) % len(assignments)
-
-            # Advance to the next block (7 days later).
-            current_block_start += timedelta(days=7)
-
-        # Update last_shift_end based on the end_date of the generation window.
         if shifts_generated:
-            # Use the shift end of the template used in the last block.
-            last_template_index = (rotation_state.rotation_index - 1) % len(assignments)
-            last_assignment = assignments[last_template_index]
-            rotation_state.last_shift_end = self._calculate_shift_end(last_assignment.shift_template, end_date)
-        else:
-            # If no shifts were created, use a fallback.
-            fallback_template = assignments[(rotation_state.rotation_index - 1) % len(assignments)]
-            rotation_state.last_shift_end = self.combine_date_time(end_date, fallback_template.shift_template.end_time)
-        rotation_state.save()
+            self._update_rotation_state(rotation_state, end_date, assignments)
 
         return shifts_generated
 
+    def _get_generation_window(self, context: GenerationContext) -> tuple[d, d]:
+        """Determine the start and end dates for generation."""
+        today = timezone.now().date()
+
+        if context.initial_setup:
+            start_date = self._next_monday(today)
+            last_day = calendar.monthrange(start_date.year, start_date.month)[1]
+            return start_date, d(start_date.year, start_date.month, last_day)
+
+        start_date = today
+        end_date = context.generation_end_date or (start_date + timedelta(days=context.batch_days))
+        return start_date, end_date
+
+
+    def _process_week_block(
+        self,
+        assignments: list,
+        rotation_state: UserShiftState,
+        block_start: d,
+        generation_end: d,
+        context: GenerationContext,
+    ) -> int:
+        """Process a single week block, returning number of shifts created."""
+        block_end = min(block_start + timedelta(days=4), generation_end)
+        template_used = False
+        shifts_created = 0
+
+        for i in range(len(assignments)):
+            template_index = (rotation_state.rotation_index + i) % len(assignments)
+            assignment = assignments[template_index]
+            template = assignment.shift_template  # noqa: F841
+
+            created = self._process_template_for_block(
+                assignment,
+                block_start,
+                block_end,
+                context
+            )
+
+            if created:
+                shifts_created += created
+                rotation_state.rotation_index = (template_index + 1) % len(assignments)
+                template_used = True
+                break
+
+        if not template_used:
+            rotation_state.rotation_index = (rotation_state.rotation_index + 1) % len(assignments)
+
+        return shifts_created
+
+    def _process_template_for_block(
+        self,
+        assignment: DepartmentMemberShift,
+        block_start: d,
+        block_end: d,
+        context: GenerationContext,
+    ) -> int:
+        """Attempt to create shifts for a template in a block, returns number created."""
+        template = assignment.shift_template
+        candidate_dates = self._get_valid_dates_for_block(assignment, block_start, context)
+        shifts_created = 0
+
+        for date in candidate_dates:
+            if not (block_start <= date <= block_end and date.weekday() <= WORK_WEEK_LAST_DAY):
+                continue
+
+            if self._can_create_shift(template, date, context.new_shift_tracker):
+                self._create_shift(assignment, date)
+                self._update_shift_tracker(template.id, date, context.new_shift_tracker)
+                shifts_created += 1
+
+        return shifts_created
+
+    def _get_valid_dates_for_block(
+        self,
+        assignment: DepartmentMemberShift,
+        block_start: d,
+        context: GenerationContext,
+    ) -> list[d]:
+        """Get candidate dates for this template in the block."""
+        datetimes = self.calculate_dates(
+            assignment,
+            next_start_date=block_start,
+            ignore_now=context.ignore_now
+        )
+        return [dt.date() for dt in datetimes]
+
+    def _can_create_shift(
+        self,
+        template: ShiftTemplate,
+        date: d,
+        new_shift_tracker: dict,
+    ) -> bool:
+        """Check if shift can be created considering max_staff constraints."""
+        existing = GeneratedShift.objects.filter(
+            source_template=template,
+            department=template.department,
+            start_datetime__date=date
+        ).count()
+
+        new_count = new_shift_tracker.get(template.id, {}).get(date, 0)
+        return (existing + new_count) < template.max_staff
+
+    def _update_shift_tracker(self, template_id: uuid, date: d, tracker: dict):
+        """Update the shift creation tracker."""
+        if template_id not in tracker:
+            tracker[template_id] = {}
+        tracker[template_id][date] = tracker[template_id].get(date, 0) + 1
+
+    def _update_rotation_state(self, state: UserShiftState, end_date: d, assignments: list):
+        """Update rotation state after generation."""
+        template = assignments[state.rotation_index].shift_template
+        state.last_shift_end = self.combine_date_time(end_date, template.end_time)
+        state.save()
+
+    def _next_monday(self, date_obj: d) -> d:
+        """Get next Monday following the given date."""
+        return date_obj + timedelta(days=(7 - date_obj.weekday()) % 7)
 
     def combine_date_time(self, date_input, time_input):
         """Safely combine date and time inputs into timezone-aware datetime."""
@@ -454,17 +518,18 @@ class ShiftGenerator:
 
         return set(existing)
 
-    def _create_shift(self, assignment, shift_dt):
-        """Create a new shift with proper datetime handling."""
-        template = assignment.shift_template
+    def _create_shift(self, assignment, shift_date):
+        """
+        Create a shift for the given assignment on shift_date using the template's start and end times.
 
-        start_dt = self.combine_date_time(shift_dt, template.start_time)
-        end_dt = self.combine_date_time(shift_dt, template.end_time)
-        print(f"Start: {start_dt} - End: {end_dt} = from _create_shift")
-        # Handle overnight shifts
+        Assumes shift_date is a date object.
+        """
+        template = assignment.shift_template
+        start_dt = self.combine_date_time(shift_date, template.start_time)
+        end_dt = self.combine_date_time(shift_date, template.end_time)
+        # Adjust for overnight shifts.
         if template.end_time < template.start_time:
             end_dt += timedelta(days=1)
-
         GeneratedShift.objects.create(
             user=assignment.department_member.user,
             department=template.department,
@@ -472,6 +537,7 @@ class ShiftGenerator:
             end_datetime=end_dt,
             source_template=template
         )
+        logger.info(f"Created shift: Start: {start_dt} - End: {end_dt} using template {template}.")
 
 
     def _calculate_shift_end(self, template, shift_date):

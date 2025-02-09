@@ -13,8 +13,8 @@ User = get_user_model()
 schema_name = connection.schema_name
 
 @shared_task(bind=True, max_retries=3)
-def generate_daily_shifts(self, tenant_schema):
-    with schema_context(tenant_schema):
+def generate_daily_shifts(self):
+    with schema_context(schema_name):
         try:
             generator = ShiftGenerator(lookahead_weeks=4)
             # For daily generation, you can omit generation_end_date to use the default batch_days
