@@ -46,7 +46,7 @@ class ShiftGenerator:
         Generate shifts for all departments.
 
         Args:
-            initial_setup: If True, generates full year of shifts.
+            initial_setup: If True, generates the remaining or full month of the shifts.
             generation_end_date: Optional end date for generation window.
 
         """
@@ -109,7 +109,6 @@ class ShiftGenerator:
         user_ids = list(user_assignments.keys())
         try:
             for user_id in user_ids:
-                print(f"Existing rotation State: {existing_state_user_ids} = from _process_department_assignments")
                 # If initial_setup and a rotation state already exists for this user, skip them.
                 if initial_setup and user_id in existing_state_user_ids:
                     continue
@@ -300,7 +299,6 @@ class ShiftGenerator:
         for i in range(len(assignments)):
             template_index = (rotation_state.rotation_index + i) % len(assignments)
             assignment = assignments[template_index]
-            template = assignment.shift_template  # noqa: F841
 
             created = self._process_template_for_block(
                 assignment,
@@ -501,23 +499,6 @@ class ShiftGenerator:
         }
         return weekday_map[day_str.upper()]
 
-    def _shift_exists(self, assignment, dates):
-        # If 'dates' is not iterable (i.e., a single date), wrap it in a list.
-        if not hasattr(dates, "__iter__") or isinstance(dates, (str, bytes)):
-            dates = [dates]
-
-        user = assignment.department_member.user
-        department = assignment.shift_template.department
-
-        existing = GeneratedShift.objects.filter(
-            user=user,
-            department=department,
-            start_datetime__date__in=dates,
-            source_template=assignment.shift_template
-        ).values_list("start_datetime__date", flat=True)
-
-        return set(existing)
-
     def _create_shift(self, assignment, shift_date):
         """
         Create a shift for the given assignment on shift_date using the template's start and end times.
@@ -538,17 +519,6 @@ class ShiftGenerator:
             source_template=template
         )
         logger.info(f"Created shift: Start: {start_dt} - End: {end_dt} using template {template}.")
-
-
-    def _calculate_shift_end(self, template, shift_date):
-        """Calculate the end datetime for a shift."""
-        end_dt = self.combine_date_time(shift_date, template.end_time)
-
-        # Handle overnight shifts
-        if template.end_time < template.start_time:
-            end_dt += timedelta(days=1)
-
-        return end_dt
 
     # Validator helper
     def calculate_projected_hours_for_data(self, member, shift_data):

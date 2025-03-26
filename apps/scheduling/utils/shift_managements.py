@@ -1,8 +1,36 @@
+from datetime import timedelta
+
 from django.db.models import Sum
 from django.utils import timezone
 
-from apps.scheduling.models import GeneratedShift
+from apps.scheduling.models import GeneratedShift, UserShiftHistory
 
+WEEKEND_START = 5
+def get_max_staff(template, date):
+    return template.max_staff_weekend if date.weekday() >= WEEKEND_START else template.max_staff_weekday
+
+def check_fatigue(user, new_shift_start):
+    last_shift = GeneratedShift.objects.filter(
+        user=user
+    ).order_by("-end_datetime").first()
+
+    if not last_shift:
+        return True
+
+    min_gap = last_shift.template.min_shift_gap
+    return (new_shift_start - last_shift.end_datetime) >= min_gap
+
+def check_cooldown(user, template):
+    last_usage = UserShiftHistory.objects.filter(
+        user=user,
+        template=template
+    ).order_by("-worked_date").first()
+
+    if not last_usage:
+        return True
+
+    cooldown_end = last_usage.worked_date + timedelta(weeks=template.cooldown_weeks)
+    return timezone.now().date() > cooldown_end
 
 def check_overtime(user, week_start):
     from apps.staff.models import WorkloadAssignment
@@ -41,3 +69,6 @@ def create_emergency_shift(doctor, start, end):
         start_datetime__lt=end,
         end_datetime__gt=start
     ).update(status="CANCELLED")
+
+
+

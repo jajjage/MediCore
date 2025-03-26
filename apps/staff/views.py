@@ -3,6 +3,7 @@ import logging
 from django.db import connection, transaction
 from django.db.models import Sum
 from django.db.transaction import on_commit
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -56,67 +57,6 @@ class DepartmentViewSet(BaseViewSet):
         "department_members"
     )
 
-# class StaffMemberViewSet(BaseViewSet):
-#     serializer_class = StaffMemberSerializer
-#     filterset_class = StaffMemberFilter
-#     search_fields = ["first_name", "last_name", "email"]
-#     ordering_fields = ["first_name", "last_name", "created_at"]
-
-#     queryset = StaffMember.objects.select_related(
-#         "hospital",
-#         "role"
-#     ).prefetch_related(
-#         "department_memberships__department",
-#         "role__permissions"
-#     )
-
-#     @action(detail=True, methods=["post"])
-#     @transaction.atomic
-#     def assign_to_department(self, request, pk=None):
-#         """Assign staff member to a department."""
-#         try:
-#             staff_member = self.get_object()
-#             serializer = DepartmentMemberSerializer(data=request.data)
-
-#             if not serializer.is_valid():
-#                 return APIResponse.validation_error(serializer.errors)
-
-#             instance = serializer.save(user=staff_member)
-#             return APIResponse.success(
-#                 data=serializer.data,
-#                 message="Staff member successfully assigned to department",
-#                 status_code=status.HTTP_201_CREATED,
-#                 extra={
-#                     "department_name": instance.department.name,
-#                     "staff_name": staff_member.get_full_name()
-#                 }
-#             )
-#         except Exception as e:
-#             return self.handle_exception(e)
-
-#     @action(detail=True, methods=["get"])
-#     @transaction.atomic
-#     def schedule(self, request, pk=None):
-#         """Get staff member's schedule."""
-#         try:
-#             staff_member = self.get_object()
-#             profile = staff_member.staff_profile
-
-#             if not profile:
-#                 return APIResponse.not_found(
-#                     message="Staff profile not found",
-#                     resource_type="Staff Profile"
-#                 )
-
-#             schedule_data = getattr(profile, "availability", None) or getattr(profile, "shift_preferences", {})
-#             return APIResponse.success(
-#                 data=schedule_data,
-#                 message="Successfully retrieved staff schedule",
-#                 extra={"staff_name": staff_member.get_full_name()}
-#             )
-#         except Exception as e:
-#             return self.handle_exception(e)
-
 class BaseProfileViewSet(BaseViewSet):
     ordering_fields = ["years_of_experience", "qualification"]
 
@@ -132,51 +72,34 @@ class DoctorProfileViewSet(BaseViewSet):
     search_fields = ["specialization", "license_number"]
     queryset = DoctorProfile.objects.select_related("user")
 
-    # @action(detail=True, methods=["get"])
-    # def patient_load(self, request, pk=None):
-    #     try:
-    #         doctor = self.get_object()
-    #         current_patients = doctor.current_patient_count
-    #         max_patients = doctor.max_patients_per_day
-    #         available_slots = max_patients - current_patients
-
-    #         return APIResponse.success(
-    #             data={
-    #                 "current_patients": current_patients,
-    #                 "max_patients": max_patients,
-    #                 "available_slots": available_slots
-    #             },
-    #             message="Successfully retrieved patient load",
-    #             extra={
-    #                 "doctor_name": doctor.staff_member.get_full_name(),
-    #                 "capacity_percentage": (current_patients / max_patients) * 100
-    #             }
-    #         )
-    #     except BusinessLogicError as e:
-    #         return APIResponse.error(message=str(e), error_code=e.error_code)
-    #     except ValidationError as e:
-    #         return APIResponse.error(message=str(e), error_code="VALIDATION_ERROR")
-    #     except Exception as e:
-    #         logger.exception(f"Unexpected error in end_assignment: {e!s}")
-    #         return APIResponse.error(
-    #             message="An unexpected error occurred",
-    #             error_code="INTERNAL_SERVER_ERROR",
-    #             status_code=500
-    #         )
-
 class NurseProfileViewSet(BaseProfileViewSet):
     serializer_class = NurseProfileSerializer
     filterset_class = NurseProfileFilter
     search_fields = ["ward_specialty", "nurse_license"]
+    lookup_field = "id"
 
     def get_queryset(self):
-        queryset = NurseProfile.objects.select_related("staff_member")
-        return super().get_queryset().filter(queryset)
+        return NurseProfile.objects.select_related("user")
+
+    def get_object(self):
+        try:
+            return get_object_or_404(self.get_queryset(), id=self.kwargs["id"])
+        except (ValueError, TypeError):
+            return self.error_response(
+                message={"error": "Invalid UUID format"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     @action(detail=True, methods=["get"])
-    def ward_assignments(self, request, pk=None):
-        nurse = self.get_object()
-        return Response(nurse.shift_preferences)
+    def ward_assignments(self, request, id=None):  # noqa: A002
+        try:
+            nurse = self.get_object()
+            return self.success_response(data=nurse.shift_preferences)
+        except NurseProfile.DoesNotExist:
+            return self.error_response(
+                message={"error": "Nurse profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 class TechnicianProfileViewSet(BaseProfileViewSet):
     serializer_class = TechnicianProfileSerializer
@@ -203,13 +126,7 @@ class DepartmentMemberViewSet(BaseViewSet):
     def perform_create(self, serializer):
         try:
             with transaction.atomic():
-                schema_name = connection.schema_name
-                from apps.scheduling.tasks import initialize_department_shifts
-                instance = serializer.save()
-                # Queue the task only after the transaction is committed
-                on_commit(lambda: initialize_department_shifts.delay(schema_name))
-                instance = serializer.save()
-                print(f"Instance created successfully: {instance.id}")
+                instance = serializer.save()  # noqa: F841
 
             headers = self.get_success_headers(serializer.data)
             return self.success_response(
@@ -342,7 +259,7 @@ class WorkloadAssignmentViewSet(BaseViewSet):
                 message="Successfully retrieved department workload summary",
                 extra={"department_id": department_id}
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return self.handle_exception(e)
 
 class StaffTransferViewSet(BaseViewSet):
