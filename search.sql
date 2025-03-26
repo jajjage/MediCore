@@ -32,3 +32,9 @@
                             DROP TRIGGER IF EXISTS enforce_same_hospital ON staff_departmentmember;
                             DROP FUNCTION IF EXISTS check_department_member_hospital();
                         """)
+
+
+"3115dc06-cb2a-4c35-adb8-17d97c20a6d7"
+"d570e131-ad4c-4efc-b25c-aba42a5ab643"
+"6f08f9b1-90c7-4c90-8e17-ec6dd74a4b0a"
+"006e955d-d504-4222-9896-442e4caeecd2"

@@ -1,13 +1,22 @@
 from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import serializers
 
 from apps.patients.mixins.patients_mixins import CalculationMixin
-from apps.scheduling.models import DepartmentMemberShift, ShiftTemplate
+from apps.scheduling.models import (
+    DepartmentMemberShift,
+    ShiftTemplate,
+    UserShiftPreference,
+)
+from apps.scheduling.serializers import (
+    NurseAvailabilitySerializer,
+    UserShiftPreferenceSerializer,
+)
 from apps.scheduling.utils.shift_generator import ShiftGenerator
 from hospital.models.hospital_members import HospitalMembership
 
@@ -61,14 +70,95 @@ class DoctorProfileSerializer(serializers.ModelSerializer, CalculationMixin):
     def get_full_name(self, obj):
         return self.format_full_name(obj.user.first_name, obj.user.middle_name, obj.user.last_name)
 
+class NurseProfileSerializer(serializers.ModelSerializer):
+    shift_preferences = UserShiftPreferenceSerializer(many=True, required=False)
 
-class NurseProfileSerializer(serializers.ModelSerializer, CalculationMixin):
     class Meta:
         model = NurseProfile
-        fields = ["id", "qualification", "years_of_experience",
-                 "certification_number", "specialty_notes", "nurse_license",
-                 "ward_specialty", "shift_preferences"]
-        read_only_fields = ["id"]
+        fields = [
+            "id",
+            "user",
+            "ward_specialty",
+            "nurse_license",
+            "shift_preferences",
+            # ... other fields
+        ]
+
+    def validate_shift_preferences(self, value):
+        departments = set()
+        for pref in value:
+            dept = pref.get("department")
+            if dept in departments:
+                raise serializers.ValidationError(
+                    f"Duplicate department preference found: {dept}"
+                )
+            departments.add(dept)
+        return value
+
+    @transaction.atomic
+    def create(self, validated_data):
+        shift_preferences_data = validated_data.pop("shift_preferences", [])
+
+        try:
+            nurse_profile = super().create(validated_data)
+
+            # Create shift preferences
+            self._handle_shift_preferences(nurse_profile.user, shift_preferences_data)
+
+            return nurse_profile
+
+        except (ValueError, TypeError) as e:
+            raise serializers.ValidationError(
+                f"Error creating nurse profile: {e!s}"
+            )
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        shift_preferences_data = validated_data.pop("shift_preferences", [])
+
+        try:
+            nurse_profile = super().update(instance, validated_data)
+
+            if shift_preferences_data:
+                self._handle_shift_preferences(nurse_profile.user, shift_preferences_data)
+
+            return nurse_profile
+
+        except (ValueError, TypeError) as e:
+            raise serializers.ValidationError(
+                f"Error updating nurse profile: {e!s}"
+            )
+
+    def _handle_shift_preferences(self, user, shift_preferences_data):
+        """AHelper method to handle shift preferences creation/update."""
+        for pref_data in shift_preferences_data:
+            department = pref_data.pop("department")
+            shift_type_ids = pref_data.pop("preferred_shift_type_ids", [])
+
+            # Get or create the preference for this user-department combination
+            preference, created = UserShiftPreference.objects.get_or_create(
+                user=user,
+                department=department,
+                defaults=pref_data
+            )
+
+            # If updating an existing record, update the fields
+            if not created:
+                for key, value in pref_data.items():
+                    setattr(preference, key, value)
+                preference.save()
+
+            # Set the many-to-many relationship
+            if shift_type_ids:
+                preference.preferred_shift_types.set(shift_type_ids)
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation["shift_preferences"] = UserShiftPreferenceSerializer(
+            instance.user.usershiftpreference_set.all(),
+            many=True
+        ).data
+        return representation
 
 class TechnicianProfileSerializer(serializers.ModelSerializer, CalculationMixin):
     class Meta:
@@ -196,9 +286,7 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
         data["user"] = user
         data["department"] = department
         shifts = data.pop("shifts", [])
-        member = DepartmentMember(**data)
         self._validate_shifts(shifts, data["department"])
-        self._validate_max_hourly(shifts, member)
         data["_shifts"] = shifts
 
         # Validate department capacity
@@ -206,7 +294,6 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Department has reached maximum staff capacity"
             )
-        # print(data)
 
         return data
 
@@ -227,9 +314,9 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
                     id=template_id,
                     department=department
                 )
-                if template.role_requirement != self.initial_data.get("role"):
+                if template.required_role != self.initial_data.get("role"):
                     raise serializers.ValidationError(
-                        f"Shift template {template_id} requires {template.role_requirement} role"
+                        f"Shift template {template_id} requires {template.required_role} role"
                     )
             except ShiftTemplate.DoesNotExist:
                 raise serializers.ValidationError(
@@ -304,38 +391,3 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
                 assignment_start=start_date,
                 assignment_end=end_date
             )
-
-    def _validate_max_hourly(self, shifts, member):
-        if shifts:
-            generator = ShiftGenerator()
-
-            try:
-                # Create a temporary complete member object
-                temp_member = SimpleNamespace(
-                    user=member.user,
-                    department=member.department,
-                    start_date=member.start_date,
-                    end_date=member.end_date,
-                    max_weekly_hours=getattr(member, "max_weekly_hours", 40)  # Default to 40 if not set
-                )
-
-                # Calculate projected hours from raw shift data
-                projected_hours = generator.calculate_projected_hours_for_data(
-                    member=temp_member,
-                    shift_data=shifts
-                )
-
-                # Convert projected_hours to float/int if it isn't already
-                projected_hours = float(projected_hours) if projected_hours else 0
-                max_hours = float(temp_member.max_weekly_hours) if temp_member.max_weekly_hours else 0
-
-                if projected_hours > max_hours:
-                    raise serializers.ValidationError(
-                        f"Projected {projected_hours}h exceeds weekly limit of {max_hours}h"
-                    )
-            except ShiftTemplate.DoesNotExist as e:
-                raise serializers.ValidationError(f"Invalid shift template: {e!s}")
-            except AttributeError as e:
-                # Add better error handling
-                raise serializers.ValidationError(f"Invalid member data: {e!s}")
-

@@ -215,9 +215,6 @@ class CompletePatientSerializer(
     def get_full_name(self, obj):
         return self.format_full_name(obj.user.first_name, obj.user.middle_name, obj.user.last_name)
 
-    # def get_age(self, obj):
-    #     return self.calculate_age(obj.date_of_birth)
-
     def validate_email(self, value):
         instance = getattr(self, "instance", None)
         if instance and instance.email == value:

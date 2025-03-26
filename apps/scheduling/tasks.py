@@ -5,32 +5,30 @@ from django.contrib.auth import get_user_model
 from django.db import DatabaseError, OperationalError, connection
 from django_tenants.utils import schema_context
 
-from .utils.shift_generator import ShiftGenerator
+from apps.scheduling.models import ShiftSwapRequest
+from apps.scheduling.shift_swap.swap_engine import process_swap_request
+
+from .shift_generator.scheduler import generate_schedule
 
 logger = get_task_logger(__name__)
 
 User = get_user_model()
-schema_name = connection.schema_name
 
 @shared_task(bind=True, max_retries=3)
-def generate_daily_shifts(self):
+def generate_initial_shifts(self, department_id, year, month, schema_name):
     with schema_context(schema_name):
         try:
-            generator = ShiftGenerator(lookahead_weeks=4)
-            # For daily generation, you can omit generation_end_date to use the default batch_days
-            count = generator.generate_department_shifts(initial_setup=False)
-            return f"Generated {count} shifts"
+            generate_schedule(department_id, year, month)
         except (DatabaseError, OperationalError) as e:
             # Retry logic etc.
-            raise self.retry(exc=e, countdown=5)
-
+            logger.exception(f"Error generating shifts: {e}")
 
 @shared_task(bind=True, max_retries=3)
-def initialize_department_shifts(self, tenant_schema):
+def process_swap_request_task(swap_request_id, tenant_schema):
     with schema_context(tenant_schema):
         try:
-            generator = ShiftGenerator()  # This will use the default lookahead if needed.
-            count = generator.generate_department_shifts(initial_setup=True)
-            return f"Generated {count} shifts"
-        except (DatabaseError, OperationalError) as e:
-            raise self.retry(exc=e, countdown=5)
+            swap_request = ShiftSwapRequest.objects.get(id=swap_request_id)
+            process_swap_request(swap_request)
+        except ShiftSwapRequest.DoesNotExist:
+            # Handle error accordingly
+            pass

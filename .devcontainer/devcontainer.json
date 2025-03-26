@@ -25,7 +25,6 @@
             "source.organizeImports.ruff": "explicit"
           }
         },
-        "ruff.lint.args": ["--config=/workspace/MediCore/pyproject.toml"],
         "black.args": ["--config=/workspace/MediCore/pyproject.toml"],
         "mypy.configFile": "/workspace/MediCore/pyproject.toml",
         "mypy.targets": ["/workspace/MediCore"]
