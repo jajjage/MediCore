@@ -5,6 +5,8 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import serializers
 
+from apps.staff.models import Department
+
 from .models import (
     GeneratedShift,
     NurseAvailability,
@@ -14,7 +16,17 @@ from .models import (
 )
 
 MAX_MONTH = 12
+TIME_WINDOW_LENGTH = 2
+MAX_HOUR = 23
+MAX_MINUTE = 59
+TIME_STRING_LENGTH = 5
+
 User = get_user_model()
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = get_user_model()
+        fields = ["id", "email", "first_name", "last_name"]
 class ShiftTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShiftTemplate
@@ -93,10 +105,11 @@ class ShiftSwapRequestSerializer(serializers.ModelSerializer):
         return swap_request
 
 class NurseAvailabilitySerializer(serializers.ModelSerializer):
-    user = serializers.SlugRelatedField(
-        slug_field="email",
+    user = UserSerializer(read_only=True)
+    user_id = serializers.PrimaryKeyRelatedField(
         queryset=get_user_model().objects.all(),
-        required=False
+        write_only=True,
+        source="user"
     )
 
     class Meta:
@@ -104,6 +117,7 @@ class NurseAvailabilitySerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "user",
+            "user_id",
             "start_date",
             "end_date",
             "reason",
@@ -124,11 +138,22 @@ class NurseAvailabilitySerializer(serializers.ModelSerializer):
             validated_data["user"] = self.context["request"].user
         return super().create(validated_data)
 
+class DepartmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Department
+        fields = ["id", "name"]
 class UserShiftPreferenceSerializer(serializers.ModelSerializer):
-    user = serializers.SlugRelatedField(
-        slug_field="username",
+    user = UserSerializer(read_only=True)
+    user_id = serializers.PrimaryKeyRelatedField(
         queryset=get_user_model().objects.all(),
-        required=False
+        write_only=True,
+        source="user"
+    )
+    department = DepartmentSerializer(read_only=True)
+    department_id = serializers.PrimaryKeyRelatedField(
+        queryset=Department.objects.all(),
+        write_only=True,
+        source="department"
     )
     preferred_shift_types = ShiftTemplateSerializer(many=True, read_only=True)
     preferred_shift_type_ids = serializers.PrimaryKeyRelatedField(
@@ -144,60 +169,44 @@ class UserShiftPreferenceSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "user",
+            "user_id",
             "department",
+            "department_id",
             "preferred_shift_types",
             "preferred_shift_type_ids",
-            "availability"
         ]
         read_only_fields = ["id"]
 
-    def validate_availability(self, value):
-        """
-        Validate the availability JSON structure.
-
-        Expected format: {
-            "MONDAY": [["09:00", "17:00"]],
-            "TUESDAY": [["09:00", "17:00"], ["18:00", "22:00"]],
-            ...
-        }
-        """
-        valid_days = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
-
-        if not isinstance(value, dict):
-            raise serializers.ValidationError("Availability must be a dictionary")
-
-        for day, time_windows in value.items():
-            if day not in valid_days:
-                raise serializers.ValidationError(f"Invalid day: {day}")
-
-            if not isinstance(time_windows, list):
-                raise serializers.ValidationError(f"Time windows for {day} must be a list")
-
-            SHIFT_WINDOW_LENGTH = 2
-            for window in time_windows:
-                if not isinstance(window, list) or len(window) != SHIFT_WINDOW_LENGTH:
-                    raise serializers.ValidationError(
-                        "Each time window must be a list of two time strings"
-                    )
-
-                try:
-                    # Validate time format
-                    from datetime import datetime
-                    for time_str in window:
-                        datetime.strptime(time_str, "%H:%M")
-                except ValueError:
-                    raise serializers.ValidationError(
-                        f"Invalid time format in {day}: {window}. Use HH:MM format"
-                    )
-
-        return value
-
     def create(self, validated_data):
+        # Extract M2M relationships
+        preferred_shift_types = validated_data.pop("preferred_shift_types", [])
+
+        # Set the current user if not provided
         if "user" not in validated_data:
             validated_data["user"] = self.context["request"].user
-        return super().create(validated_data)
 
+        # Create the instance
+        instance = UserShiftPreference.objects.create(**validated_data)
 
+        # Set M2M relationships
+        instance.preferred_shift_types.set(preferred_shift_types)
+
+        return instance
+
+    def update(self, instance, validated_data):
+        # Extract M2M relationships
+        preferred_shift_types = validated_data.pop("preferred_shift_types", None)
+
+        # Update the instance fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Update M2M relationships if provided
+        if preferred_shift_types is not None:
+            instance.preferred_shift_types.set(preferred_shift_types)
+
+        return instance
 class ShiftGenerationSerializer(serializers.Serializer):
     department_id = serializers.CharField(
         required=True,
@@ -248,3 +257,4 @@ class ShiftGenerationSerializer(serializers.Serializer):
         )
 
         return validated_data
+

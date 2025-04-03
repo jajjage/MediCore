@@ -207,13 +207,6 @@ class StaffTransferSerializer(serializers.ModelSerializer, CalculationMixin):
 class DepartmentMemberSerializer(serializers.ModelSerializer):
     workload = WorkloadAssignmentSerializer(many=True, read_only=True)
     transfers = StaffTransferSerializer(many=True, read_only=True)
-    shifts = serializers.ListField(
-        child=serializers.DictField(),
-        required=False,
-        write_only=True,
-        help_text="List of shift assignments in format: "
-                 "{shift_template: UUID, start_date: YYYY-MM-DD, end_date: YYYY-MM-DD}"
-    )
     user = serializers.UUIDField(write_only=True)  # For accepting UUID in request
     user_details = serializers.SerializerMethodField(read_only=True)  # For returning user details
     department = serializers.UUIDField(write_only=True)
@@ -221,7 +214,7 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
         model = DepartmentMember
         fields = ["id", "department", "user", "user_details", "role", "start_date", "end_date",
                  "is_primary", "assignment_type", "time_allocation", "emergency_contact",
-                 "workload", "transfers", "is_active", "shifts", "max_weekly_hours"]
+                 "workload", "transfers", "is_active", "max_weekly_hours"]
         read_only_fields = ["id", "workload", "transfers"]
         extra_kwargs = {
             "user": {"required": True},
@@ -285,9 +278,6 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
         # Replace UUIDs with actual model instances
         data["user"] = user
         data["department"] = department
-        shifts = data.pop("shifts", [])
-        self._validate_shifts(shifts, data["department"])
-        data["_shifts"] = shifts
 
         # Validate department capacity
         if not self._check_department_capacity(data):
@@ -296,32 +286,6 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
             )
 
         return data
-
-    def _validate_shifts(self, shifts, department):
-        for shift in shifts:
-            template_id = shift.get("shift_template")
-            # Validate dates
-            try:
-                if "start_date" in shift:
-                    parse_date(shift["start_date"])
-                if "end_date" in shift:
-                    parse_date(shift["end_date"])
-            except ValueError:
-                raise serializers.ValidationError("Invalid date format. Use YYYY-MM-DD")
-
-            try:
-                template = ShiftTemplate.objects.get(
-                    id=template_id,
-                    department=department
-                )
-                if template.required_role != self.initial_data.get("role"):
-                    raise serializers.ValidationError(
-                        f"Shift template {template_id} requires {template.required_role} role"
-                    )
-            except ShiftTemplate.DoesNotExist:
-                raise serializers.ValidationError(
-                    f"Invalid shift template ID: {template_id} for this department"
-                )
 
 
     def _check_department_capacity(self, data):
@@ -345,9 +309,6 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
             dept_id = validated_data["department"].get("id")
             validated_data["department"] = Department.objects.get(id=dept_id)
 
-        # Get shifts data before creating member
-        shifts = validated_data.pop("_shifts", [])
-
         try:
             # Create the department member
             member = DepartmentMember.objects.create(
@@ -363,8 +324,6 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
                 max_weekly_hours=validated_data.get("max_weekly_hours")
             )
 
-            # Create associated shifts
-            self._create_shifts(member, shifts)
 
             return member
 
@@ -378,16 +337,3 @@ class DepartmentMemberSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(f"Type error: {e!s}")
         except Exception as e:  # noqa: BLE001
             raise serializers.ValidationError(f"Unexpected error: {e!s}")
-
-    def _create_shifts(self, member, shifts):
-        for shift in shifts:
-            # Ensure dates are properly parsed
-            start_date = parse_date(shift.get("start_date", member.start_date))
-            end_date = parse_date(shift.get("end_date", member.end_date)) if shift.get("end_date") else None
-
-            DepartmentMemberShift.objects.create(
-                department_member=member,
-                shift_template_id=shift["shift_template"],
-                assignment_start=start_date,
-                assignment_end=end_date
-            )

@@ -203,10 +203,17 @@ class UserShiftState(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="shift_state")
     department = models.ForeignKey("staff.Department", on_delete=models.CASCADE)
-    current_template = models.ForeignKey("ShiftTemplate", on_delete=models.CASCADE)
-    last_shift_end = models.DateTimeField()
+    current_template = models.ForeignKey(
+        "ShiftTemplate",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        help_text="Current shift template used by the nurse. Updated after each assignment."
+ )
+    last_shift_end = models.DateTimeField(null=True)
     rotation_index = models.IntegerField(default=0)
     consecutive_weeks = models.IntegerField(default=0)
+    weekend_shift_count = models.IntegerField(default=0)
     cooldowns = models.JSONField(default=dict)
 
     class Meta:
@@ -330,7 +337,58 @@ class UserShiftPreference(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     department = models.ForeignKey(Department, on_delete=models.CASCADE)
     preferred_shift_types = models.ManyToManyField(ShiftTemplate)
-    availability = models.JSONField(default=dict)  # {day: [time_windows]}
+    # max_shifts_per_month = models.PositiveIntegerField(
+    #     default=8,
+    #     validators=[MinValueValidator(1), MaxValueValidator(31)]
+    # )
+    # max_consecutive_shifts = models.PositiveIntegerField(
+    #     default=3,
+    #     validators=[MinValueValidator(1), MaxValueValidator(7)]
+    # )
+    # max_shifts_per_week = models.PositiveIntegerField(
+    #     default=5,
+    #     validators=[MinValueValidator(1), MaxValueValidator(7)]
+    # )
+    # max_shifts_per_day = models.PositiveIntegerField(
+    #     default=2,
+    #     validators=[MinValueValidator(1), MaxValueValidator(3)]
+    # )
+    # max_night_shifts_per_month = models.PositiveIntegerField(
+    #     default=2,
+    #     validators=[MinValueValidator(1), MaxValueValidator(31)]
+    # )
+    # max_night_shifts_per_week = models.PositiveIntegerField(
+    #     default=1,
+    #     validators=[MinValueValidator(1), MaxValueValidator(7)]
+    # )
+    # max_night_shifts_per_day = models.PositiveIntegerField(
+    #     default=1,
+    #     validators=[MinValueValidator(1), MaxValueValidator(3)]
+    # )
+    # max_weekend_shifts_per_month = models.PositiveIntegerField(
+    #     default=4,
+    #     validators=[MinValueValidator(1), MaxValueValidator(31)]
+    # )
+    # max_weekend_shifts_per_week = models.PositiveIntegerField(
+    #     default=2,
+    #     validators=[MinValueValidator(1), MaxValueValidator(7)]
+    # )
+    # max_weekend_shifts_per_day = models.PositiveIntegerField(
+    #     default=1,
+    #     validators=[MinValueValidator(1), MaxValueValidator(3)]
+    # )
+    # max_consecutive_weekend_shifts = models.PositiveIntegerField(
+    #     default=2,
+    #     validators=[MinValueValidator(1), MaxValueValidator(7)]
+    # )
+    # max_consecutive_night_shifts = models.PositiveIntegerField(
+    #     default=2,
+    #     validators=[MinValueValidator(1), MaxValueValidator(7)]
+    # )
+    # max_consecutive_shifts_per_month = models.PositiveIntegerField(
+    #     default=4,
+    #     validators=[MinValueValidator(1), MaxValueValidator(31)]
+    # )
 
     class Meta:
         db_table = "nurse_shift_preferences"

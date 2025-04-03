@@ -15,6 +15,13 @@ from apps.patients.models import (
     PatientPrescription,
     PatientVisit,
 )
+from apps.scheduling.models import (
+    NurseAvailability,
+    ShiftSwapRequest,
+    ShiftTemplate,
+    UserShiftPreference,
+    WeekendShiftPolicy,
+)
 from apps.staff.models import (
     Department,
     DepartmentMember,
@@ -69,6 +76,12 @@ class Command(BaseCommand):
                     "doctorprofile": ["view", "add", "change", "delete"],
                     "nurseprofile": ["view", "add", "change", "delete"],
                     "technicianprofile": ["view", "add", "change", "delete"],
+                    "nurseavailability": ["view", "add", "change", "delete"],
+                    "shifttemplate": ["view", "add", "change", "delete"],
+                    "usershiftpreference": ["view", "add", "change", "delete"],
+                    "shiftswaprequest": ["view", "add", "change", "delete"],
+                    "weekendshiftpolicy": ["view", "add", "change", "delete"],
+
 
                 },
             },
@@ -87,6 +100,12 @@ class Command(BaseCommand):
                     "patientoperation": ["view", "add", "change"],
                     "patientvisit": ["view", "add", "change"],
                     "patientprescription": ["view", "add", "change"],
+                    "nurseavailability": ["view", "add", "change", "delete"],
+                    "shifttemplate": ["view", "add", "change", "delete"],
+                    "usershiftpreference": ["view", "add", "change", "delete"],
+                    "shiftswaprequest": ["view", "add", "change", "delete"],
+                    "weekendshiftpolicy": ["view", "add", "change", "delete"],
+
                 },
             },
             "HEAD_DOCTOR": {
@@ -104,6 +123,12 @@ class Command(BaseCommand):
                     "patientoperation": ["view", "add", "change", "delete"],
                     "patientvisit": ["view", "add", "change", "delete"],
                     "patientprescription": ["view", "add", "change"],
+                    "nurseavailability": ["view", "add", "change", "delete"],
+                    "shifttemplate": ["view", "add", "change", "delete"],
+                    "usershiftpreference": ["view", "add", "change", "delete"],
+                    "shiftswaprequest": ["view", "add", "change", "delete"],
+                    "weekendshiftpolicy": ["view", "add", "change", "delete"],
+
                 },
             },
             "NURSE": {
@@ -180,6 +205,11 @@ class Command(BaseCommand):
             "technicianprofile": ContentType.objects.get_for_model(TechnicianProfile),
             "hospitalprofile": ContentType.objects.get_for_model(HospitalProfile),
             "hospitalmembership": ContentType.objects.get_for_model(HospitalMembership),
+            "nurseavailability": ContentType.objects.get_for_model(NurseAvailability),
+            "shifttemplate": ContentType.objects.get_for_model(ShiftTemplate),
+            "weekendshiftpolicy": ContentType.objects.get_for_model(WeekendShiftPolicy),
+            "usershiftpreference": ContentType.objects.get_for_model(UserShiftPreference),
+            "shiftswaprequest": ContentType.objects.get_for_model(ShiftSwapRequest),
             "role": ContentType.objects.get_for_model(Role),
             "client": ContentType.objects.get_for_model(Client),
             "domain": ContentType.objects.get_for_model(Domain),

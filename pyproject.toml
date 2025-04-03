@@ -137,7 +137,8 @@ ignore = [
     "ARG001",   # Argument should be lowercase
     "F401",     # Use of `assert` detected
     "ARG003",   # Avoid using mutable default arguments
-    "FBT002"    #
+    "FBT002" ,  #
+    "ERA001"    #
 ]
 
 [tool.ruff.lint.per-file-ignores]

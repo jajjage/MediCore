@@ -6,9 +6,8 @@ from django.db import DatabaseError, OperationalError, connection
 from django_tenants.utils import schema_context
 
 from apps.scheduling.models import ShiftSwapRequest
+from apps.scheduling.shift_generator.scheduler import generate_monthly_schedule
 from apps.scheduling.shift_swap.swap_engine import process_swap_request
-
-from .shift_generator.scheduler import generate_schedule
 
 logger = get_task_logger(__name__)
 
@@ -18,7 +17,7 @@ User = get_user_model()
 def generate_initial_shifts(self, department_id, year, month, schema_name):
     with schema_context(schema_name):
         try:
-            generate_schedule(department_id, year, month)
+            generate_monthly_schedule(department_id, year, month)
         except (DatabaseError, OperationalError) as e:
             # Retry logic etc.
             logger.exception(f"Error generating shifts: {e}")

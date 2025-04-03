@@ -44,7 +44,6 @@ ROLE_PERMISSIONS = {
                     "doctorprofile": ["view", "add", "change", "delete"],
                     "nurseprofile": ["view", "add", "change", "delete"],
                     "technicianprofile": ["view", "add", "change", "delete"],
-
                 },
             },
             "DOCTOR": {
@@ -79,6 +78,13 @@ ROLE_PERMISSIONS = {
                     "patientoperation": ["view", "add", "change", "delete"],
                     "patientvisit": ["view", "add", "change", "delete"],
                     "patientprescription": ["view", "add", "change"],
+                    "nurseavailability": ["view", "add", "change", "delete"],
+                    "shifttemplate": ["view", "add", "change", "delete"],
+                    "shiftgeneration": ["view", "add", "change", "delete"],
+                    "usershiftpreference": ["view", "add", "change", "delete"],
+                    "shiftswaprequest": ["view", "add", "change", "delete"],
+                    "weekendshiftpolicy": ["view", "add", "change", "delete"],
+
                 },
             },
             "NURSE": {
@@ -162,6 +168,7 @@ class RolePermission(BasePermission):
             resource_ = resource.replace("-", " ")
             normalized_resource = "".join(word for word in resource_.split())
             action = view.action
+            print(f"Resource: {normalized_resource}, Action: {action}")
 
             # Map DRF actions to permissions
             action_to_permission = {
@@ -206,6 +213,7 @@ class RolePermission(BasePermission):
 
             # Check if the user's role has the required permission
             model_permissions = permissions.get(normalized_resource, [])
+            cache.clear()  # Clear cache delete later
             if not model_permissions:
                 allowed_permissions = ROLE_PERMISSIONS.get(user_role, {}).get(
                     "permissions", {}

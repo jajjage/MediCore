@@ -1,4 +1,7 @@
 # views.py
+from datetime import timezone
+
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -9,11 +12,18 @@ from apps.scheduling.utils.filters import ShiftTemplateFilter
 from apps.scheduling.utils.shift_generator import ShiftGenerator
 from base_view.base_view import BaseViewSet
 
-from .models import ShiftSwapRequest, ShiftTemplate
+from .models import (
+    NurseAvailability,
+    ShiftSwapRequest,
+    ShiftTemplate,
+    UserShiftPreference,
+)
 from .serializers import (
+    NurseAvailabilitySerializer,
     ShiftGenerationSerializer,
     ShiftSwapRequestSerializer,
     ShiftTemplateSerializer,
+    UserShiftPreferenceSerializer,
 )
 from .tasks import process_swap_request_task
 
@@ -98,3 +108,96 @@ class ShiftSwapRequestViewSet(BaseViewSet):
         swap_request.status = ShiftSwapRequest.Status.REJECTED
         swap_request.save()
         return self.success_response(data={"status": swap_request.status})
+
+
+
+class NurseAvailabilityViewSet(BaseViewSet):
+    """
+    A viewset that provides the standard actions to create, retrieve, update.
+
+    and delete NurseAvailability records. Nurses can only access and modify
+    their own availability entries.
+    """
+
+    serializer_class = NurseAvailabilitySerializer
+
+    def get_queryset(self):
+        # Each nurse can only see their own availability records
+        return NurseAvailability.objects.all()
+
+    def perform_create(self, serializer):
+        # Automatically assign the logged-in user to the availability record
+        serializer.save()
+
+    @action(detail=False, methods=["get"], url_path="upcoming")
+    def upcoming(self, request):
+        """
+        ACustom action to list all upcoming availability entries (where the start_date.
+
+        is today or in the future) for the logged-in nurse.
+        """
+        today = timezone.now().date()
+        upcoming_records = self.get_queryset().filter(start_date__gte=today)
+        serializer = self.get_serializer(upcoming_records, many=True)
+        return Response(serializer.data)
+
+class UserShiftPreferenceViewSet(BaseViewSet):
+    serializer_class = UserShiftPreferenceSerializer
+
+
+    def get_queryset(self):
+        """
+        Filter queryset based on user permissions.
+
+        - Staff/admins can see all records
+        - Regular users can only see their own records
+        """
+        user = self.request.user
+        queryset = UserShiftPreference.objects.all().select_related(
+            "user", "department"
+        ).prefetch_related("preferred_shift_types")
+
+        if not (user.is_staff or user.is_superuser):
+            queryset = queryset.filter(user=user)
+
+        # Allow filtering by department
+        department_id = self.request.query_params.get("department_id")
+        if department_id:
+            queryset = queryset.filter(department_id=department_id)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        """Ensure the user is set to the current user for new records."""
+        serializer.save()
+
+    @action(detail=False, methods=["get"])
+    def my_preferences(self, request):
+        """Endpoint to get current user's preferences."""
+        queryset = self.get_queryset().filter(user=request.user)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["patch"])
+    def update_shift_types(self, request, pk=None):
+        """Endpoint to update only the preferred shift types."""
+        instance = self.get_object()
+
+        shift_type_ids = request.data.get("preferred_shift_type_ids", [])
+
+        if not isinstance(shift_type_ids, list):
+            return Response(
+                {"error": "preferred_shift_type_ids must be a list"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            shift_types = ShiftTemplate.objects.filter(id__in=shift_type_ids)
+            instance.preferred_shift_types.set(shift_types)
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        except (ValidationError, ObjectDoesNotExist) as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
